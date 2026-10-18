@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { companies } from './dist/catalog.js';
 import { feeds, createNewsService } from './feeds.mjs';
+import { createQuoteService } from './quotes.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const deriveKey = promisify(scrypt);
@@ -52,7 +53,7 @@ async function passwordHash(password,salt){return deriveKey(password,salt,64,{N:
 const tokenHash=token=>createHash('sha256').update(token).digest('hex');
 function tokenFrom(req){return (req.headers.cookie||'').split(';').map(c=>c.trim()).find(c=>c.startsWith('stocklens_session='))?.slice(18)||'';}
 
-export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch}={}){
+export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch,quoteApiKey='',quoteFetcher=fetch}={}){
   if(publicOrigin){
     let url;try{url=new URL(publicOrigin);}catch{throw new Error('APP_ORIGIN must be an http(s) origin');}
     if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('APP_ORIGIN must contain only scheme, hostname and optional port');
@@ -68,6 +69,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
   if(!db.prepare('PRAGMA table_info(user_state)').all().some(column=>column.name==='revision'))db.exec('ALTER TABLE user_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 0');
   db.exec('CREATE TABLE IF NOT EXISTS recovery_codes(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,code_hash TEXT NOT NULL)');
   const news=createNewsService(db,{fetcher:newsFetcher});
+  const quotes=createQuoteService(db,{apiKey:quoteApiKey,fetcher:quoteFetcher});
   let newsTimer;
   const newRecoveryCode=()=>randomBytes(24).toString('hex');
   const attempts=new Map();
@@ -96,7 +98,15 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       const origin=publicOrigin||`http://${req.headers.host}`;
       if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origin)fail(403,'คำขอไม่ได้มาจากเว็บไซต์นี้');
       const pathname=new URL(req.url,origin).pathname;
-      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.3.0'});}
+      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.3.1'});}
+      if(pathname==='/api/quotes'&&req.method==='GET'){
+        const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
+        const holdings=userData(user).state.holdings;
+        const result=await quotes.get(holdings.map(h=>h.symbol));
+        if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+        const currentSymbols=new Set(userData(user).state.holdings.map(h=>h.symbol));
+        return send(res,200,{...result,items:result.items.filter(item=>currentSymbols.has(item.symbol))});
+      }
       if(pathname==='/api/news'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
         const snapshot=news.snapshot(),sources=userData(user).state.sources;
@@ -179,21 +189,21 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         return send(res,200,{format:'stocklens-export-v1',exportedAt:new Date().toISOString(),...userData(user)});
       }
       if(pathname.startsWith('/api/'))fail(404,'ไม่พบ API นี้');
-      const assets={'/':['index.html','text/html'],'/index.html':['index.html','text/html'],'/app.js':['app.js','text/javascript'],'/auth.js':['auth.js','text/javascript'],'/styles.css':['styles.css','text/css'],'/theme.css':['theme.css','text/css'],'/catalog.js':['catalog.js','text/javascript'],'/pwa.js':['pwa.js','text/javascript'],'/sw.js':['sw.js','text/javascript'],'/manifest.webmanifest':['manifest.webmanifest','application/manifest+json'],'/offline.html':['offline.html','text/html'],'/icon.svg':['icon.svg','image/svg+xml'],'/icon-192.png':['icon-192.png','image/png'],'/icon-512.png':['icon-512.png','image/png'],'/apple-touch-icon.png':['apple-touch-icon.png','image/png']};
+      const assets={'/quotes-ui.js':['quotes-ui.js','text/javascript'],'/':['index.html','text/html'],'/index.html':['index.html','text/html'],'/app.js':['app.js','text/javascript'],'/auth.js':['auth.js','text/javascript'],'/styles.css':['styles.css','text/css'],'/theme.css':['theme.css','text/css'],'/catalog.js':['catalog.js','text/javascript'],'/pwa.js':['pwa.js','text/javascript'],'/sw.js':['sw.js','text/javascript'],'/manifest.webmanifest':['manifest.webmanifest','application/manifest+json'],'/offline.html':['offline.html','text/html'],'/icon.svg':['icon.svg','image/svg+xml'],'/icon-192.png':['icon-192.png','image/png'],'/icon-512.png':['icon-512.png','image/png'],'/apple-touch-icon.png':['apple-touch-icon.png','image/png']};
       const asset=assets[pathname];if(!asset||!['GET','HEAD'].includes(req.method))fail(404,'ไม่พบหน้าเว็บ');
       const data=readFileSync(path.join(root,'dist',asset[0]));res.writeHead(200,{'Content-Type':asset[1]+'; charset=utf-8'});res.end(req.method==='HEAD'?undefined:data);
     }catch(error){send(res,error.status||500,{error:error.status?error.message:'ระบบขัดข้อง กรุณาลองใหม่'});if(!error.status)console.error(error.message);}
   });
   server.requestTimeout=15000;server.headersTimeout=10000;
   if(refreshNews){server.once('listening',()=>{news.refresh().catch(()=>{});newsTimer=setInterval(()=>news.refresh().catch(()=>{}),15*60*1000);newsTimer.unref();});}
-  server.on('close',()=>{clearInterval(newsTimer);news.close();db.close();});
+  server.on('close',()=>{clearInterval(newsTimer);news.close();quotes.close();db.close();});
   return server;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const port=Number(process.env.PORT||4173),host=process.env.HOST||'127.0.0.1';
   if(!Number.isInteger(port)||port<1||port>65535)throw new Error('PORT must be an integer from 1 to 65535');
   if(!['127.0.0.1','localhost','::1'].includes(host)&&!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN before listening beyond localhost');
-  const server=createApp({databasePath:process.env.DATABASE_PATH?path.resolve(process.env.DATABASE_PATH):undefined,publicOrigin:process.env.APP_ORIGIN||null,refreshNews:process.env.NEWS_ENABLED!=='false'});
+  const server=createApp({databasePath:process.env.DATABASE_PATH?path.resolve(process.env.DATABASE_PATH):undefined,publicOrigin:process.env.APP_ORIGIN||null,refreshNews:process.env.NEWS_ENABLED!=='false',quoteApiKey:process.env.FINNHUB_API_KEY?.trim()||''});
   server.listen(port,host,()=>console.log(`StockLens: http://${host}:${server.address().port}`));
   server.on('error',error=>{console.error(error.code==='EADDRINUSE'?`พอร์ต ${port} ถูกใช้อยู่แล้ว ตั้งค่า PORT เป็นหมายเลขอื่น`:error.message);process.exitCode=1;});
   for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{server.close();server.closeIdleConnections();});

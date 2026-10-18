@@ -27,7 +27,7 @@ try{
   await page.screenshot({path:'test-artifacts/sources-desktop.png',fullPage:true});
   await page.locator('.source-entry').last().locator('.remove').click();await page.locator('[data-source-confirm]').click();await page.waitForFunction(()=>document.querySelectorAll('.source-entry').length===3);
   await page.locator('.sidebar [data-page=search]').click();await page.locator('#company-query').fill('แอปเปิล');assert.equal(await page.locator('.company-card').count(),1);
-  await page.locator('.sidebar [data-page=portfolio]').click();assert.match(await page.locator('tbody').innerText(),/100/);
+  await page.locator('.sidebar [data-page=portfolio]').click();assert.match(await page.locator('tbody').first().innerText(),/100/);
   await page.locator('.sidebar [data-page=insights]').click();await page.locator('#ai-symbol').selectOption('NVDA');assert.match(await page.locator('.ai-trend').innerText(),/ยังประเมินไม่ได้/);
   // A stale view must reload rather than silently overwrite a newer save.
   const snapshot=await page.evaluate(()=>fetch('/api/session').then(r=>r.json()));

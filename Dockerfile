@@ -3,7 +3,7 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=4173 DATABASE_PATH=/app/.data/stocklen
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && mkdir -p /app/.data && chown -R node:node /app
-COPY --chown=node:node server.mjs feeds.mjs ./
+COPY --chown=node:node server.mjs feeds.mjs quotes.mjs ./
 COPY --chown=node:node dist ./dist
 COPY --chown=node:node scripts/backup.mjs ./scripts/backup.mjs
 USER node
