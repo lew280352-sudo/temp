@@ -3,17 +3,19 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#283d57">
-  <meta name="description" content="StockLens ต้นแบบแอปติดตามพอร์ต สรุปข่าวบริษัท และแนวโน้ม AI ภาษาไทย">
+  <meta name="description" content="StockLens แอปข่าวบริษัทสหรัฐฯ และพอร์ตส่วนตัว">
+  <link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes">
   <title>StockLens — มองข่าวให้เห็นภาพ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="theme.css">
-  <script src="app.js" defer></script><script src="auth.js" defer></script>
+  <script src="app.js" defer></script><script src="auth.js" defer></script><script src="pwa.js" defer></script>
 </head>
 <body class="signed-out">
+  <div class="install-bar"><span>STOCKLENS · US</span><button id="install-app" class="text-button">ติดตั้ง / วิธีติดตั้ง</button></div><p id="install-help" class="install-help" hidden>Android / คอม: เปิดเมนู Chrome หรือ Edge แล้วเลือกติดตั้งแอป · iPhone: เปิดใน Safari กดแชร์ แล้วเลือกเพิ่มไปยังหน้าจอโฮม · บนมือถือจำเป็นต้องเปิดผ่าน URL HTTPS</p><p id="offline-status" class="offline-status" role="status" hidden>ออฟไลน์ — บันทึกข้อมูลและโหลดข่าวไม่ได้จนกว่าจะเชื่อมต่ออีกครั้ง</p>
   <section id="auth-screen" aria-label="สมัครสมาชิกและเข้าสู่ระบบ">
     <div class="auth-story"><a class="brand" href="#register"><span class="brand-icon">s<span>l</span></span>stocklens<span class="brand-dot">.</span></a><div class="auth-story-content"><div class="eyebrow">YOUR PERSONAL MARKET PERSPECTIVE</div><h1>ข่าวที่กระจัดกระจาย<br>กลายเป็นภาพที่ชัดเจน</h1><p>รู้จักบริษัทให้มากกว่าราคาหุ้น<br>เชื่อมข่าว แหล่งข้อมูล และพอร์ตของคุณไว้ด้วยกัน</p><div class="auth-preview"><div class="auth-preview-head"><span>YOUR DAILY PERSPECTIVE</span><span class="preview-dot"></span></div><div class="auth-preview-title">เรื่องสำคัญของหุ้นที่คุณเลือก</div><div class="auth-preview-lines"><span></span><span></span><span></span></div><div class="auth-source-tags"><span>บริษัท</span><span>คู่ค้า</span><span>ข่าวการเงิน</span></div><div class="auth-mini-chart" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="auth-steps"><span>01 <b>สร้างบัญชี</b></span><span>02 <b>เพิ่มหุ้น</b></span><span>03 <b>เลือกแหล่งข่าว</b></span></div></div><div class="auth-story-footer">A CLEARER VIEW. EVERY DAY.<span>STOCKLENS / 2026</span></div></div>
-    <div class="auth-panel"><div class="auth-panel-top"><span>พื้นที่ลงทุนส่วนตัวของคุณ</span><span class="demo-label">MARKET DATA DEMO</span></div><div id="auth-content" class="auth-content"><p class="muted" role="status">กำลังตรวจสอบการเข้าสู่ระบบ…</p></div><div class="auth-panel-footer">ข่าว ราคา และผล AI ยังเป็นข้อมูลสาธิต<br>AI อาจคาดการณ์ผิดพลาด ไม่ใช่คำแนะนำการลงทุน</div></div>
+    <div class="auth-panel"><div class="auth-panel-top"><span>พื้นที่ลงทุนส่วนตัวของคุณ</span><span class="demo-label">US COMPANIES</span></div><div id="auth-content" class="auth-content"><p class="muted" role="status">กำลังตรวจสอบการเข้าสู่ระบบ…</p></div><div class="auth-panel-footer">อ่านหัวข้อข่าวต้นทาง · ราคาหุ้นและ AI ยังไม่เปิดใช้<br>AI อาจคาดการณ์ผิดพลาด ไม่ใช่คำแนะนำการลงทุน</div></div>
   </section>
   <aside class="sidebar">
     <a class="brand" href="#overview"><span class="brand-icon">s<span>l</span></span>stocklens<span class="brand-dot">.</span></a>
@@ -21,7 +23,7 @@
     <div class="nav-label">WORKSPACE</div>
     <nav aria-label="เมนูหลัก">
       <button data-page="overview" class="nav active"><span data-icon="grid"></span>ภาพรวม</button>
-      <button data-page="news" class="nav"><span data-icon="news"></span>ข่าวสาร & บทสรุป<span class="nav-count">6</span></button>
+      <button data-page="news" class="nav"><span data-icon="news"></span>ข่าวสาร & บทสรุป</button>
       <button data-page="portfolio" class="nav"><span data-icon="wallet"></span>พอร์ตของฉัน</button>
       <button data-page="insights" class="nav"><span data-icon="spark"></span>AI Insights<span class="mini-new">LAB</span></button>
       <button data-page="search" class="nav"><span data-icon="search"></span>ค้นหาบริษัท</button>
@@ -35,9 +37,9 @@
     <a class="export-link" href="/api/export" download>ดาวน์โหลดข้อมูลบัญชี</a>
   </aside>
   <div class="app">
-    <header class="topbar"><div class="breadcrumb">Workspace <span>/</span> <b id="breadcrumb">ภาพรวม</b></div><div class="top-actions"><button id="quick-search" class="search-button"><span data-icon="search"></span><span>ค้นหาหุ้นหรือบริษัท</span><kbd>/</kbd></button><span class="demo-label"><i></i> DEMO MODE</span><button class="icon-button" data-page="sources" aria-label="แหล่งข้อมูล"><span data-icon="layers"></span></button><button class="icon-button" data-page="alerts" aria-label="การแจ้งเตือน"><span data-icon="bell"></span><i class="notification-dot"></i></button><button class="avatar small account-logout" data-logout aria-label="ออกจากระบบ" title="ออกจากระบบ"><span data-user-avatar>L</span></button></div></header>
+    <header class="topbar"><div class="breadcrumb">Workspace <span>/</span> <b id="breadcrumb">ภาพรวม</b></div><div class="top-actions"><button id="quick-search" class="search-button"><span data-icon="search"></span><span>ค้นหาหุ้นหรือบริษัท</span><kbd>/</kbd></button><span class="demo-label"><i></i> US MARKET</span><button class="icon-button" data-page="sources" aria-label="แหล่งข้อมูล"><span data-icon="layers"></span></button><button class="icon-button" data-page="alerts" aria-label="การแจ้งเตือน"><span data-icon="bell"></span></button><button class="avatar small account-logout" data-logout aria-label="ออกจากระบบ" title="ออกจากระบบ"><span data-user-avatar>L</span></button></div></header>
     <main id="main"></main>
-    <footer class="risk-footer"><span data-icon="shield"></span><span><b>AI อาจคาดการณ์ผิดพลาด</b> ไม่ใช่คำแนะนำการลงทุน · ราคา ข่าว และแนวโน้มทั้งหมดเป็นข้อมูลสาธิต</span><span class="footer-mark">STOCKLENS / PROTOTYPE</span></footer>
+    <footer class="risk-footer"><span data-icon="shield"></span><span><b>AI อาจคาดการณ์ผิดพลาด</b> ไม่ใช่คำแนะนำการลงทุน · ข่าวจาก RSS บริษัท · ยังไม่มีราคาหุ้นหรือผลคาดการณ์ AI</span><span class="footer-mark">STOCKLENS / US</span></footer>
   </div>
   <dialog id="modal"><div class="dialog-heading"><h2 id="modal-title"></h2><button id="close-modal" class="icon-button" aria-label="ปิด">✕</button></div><div id="modal-body"></div></dialog>
   <div id="toast" role="status" aria-live="polite"></div>

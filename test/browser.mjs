@@ -26,18 +26,18 @@ try{
   await page.locator('#source-form [name=name]').fill('Duplicate');await page.locator('#source-form [name=url]').fill('https://example.com/news');await page.locator('#source-form [type=submit]').click();await page.waitForFunction(()=>document.querySelector('#source-error').textContent.includes('มี URL'));
   await page.screenshot({path:'test-artifacts/sources-desktop.png',fullPage:true});
   await page.locator('.source-entry').last().locator('.remove').click();await page.locator('[data-source-confirm]').click();await page.waitForFunction(()=>document.querySelectorAll('.source-entry').length===3);
-  await page.locator('.sidebar [data-page=search]').click();await page.locator('#company-query').fill('กสิกรไทย');assert.equal(await page.locator('.company-card').count(),1);
+  await page.locator('.sidebar [data-page=search]').click();await page.locator('#company-query').fill('แอปเปิล');assert.equal(await page.locator('.company-card').count(),1);
   await page.locator('.sidebar [data-page=portfolio]').click();assert.match(await page.locator('tbody').innerText(),/100/);
-  await page.locator('.sidebar [data-page=insights]').click();await page.locator('#ai-symbol').selectOption('CPALL');assert.match(await page.locator('.ai-trend').innerText(),/ปรับลง/);
+  await page.locator('.sidebar [data-page=insights]').click();await page.locator('#ai-symbol').selectOption('NVDA');assert.match(await page.locator('.ai-trend').innerText(),/ยังประเมินไม่ได้/);
   // A stale view must reload rather than silently overwrite a newer save.
   const snapshot=await page.evaluate(()=>fetch('/api/session').then(r=>r.json()));
   await page.evaluate(async snapshot=>{const next=structuredClone(snapshot.state);next.holdings[0].qty=222;const r=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:snapshot.user.id,revision:snapshot.revision,state:next})});if(!r.ok)throw new Error('failed to prepare concurrent save');},snapshot);
-  await page.locator('.sidebar [data-page=portfolio]').click();await page.locator('[data-edit=PTT]').click();await page.locator('[name=qty]').fill('333');await page.locator('#holding-form [type=submit]').click();
+  await page.locator('.sidebar [data-page=portfolio]').click();await page.locator('[data-edit=AAPL]').click();await page.locator('[name=qty]').fill('333');await page.locator('#holding-form [type=submit]').click();
   await page.waitForFunction(()=>document.querySelector('tbody').textContent.includes('222'));
   assert.equal((await page.evaluate(()=>fetch('/api/session').then(r=>r.json()))).state.holdings[0].qty,222);
   // Expired/logout session must clear private content on the next attempted save.
   await page.evaluate(()=>fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));
-  await page.locator('[data-edit=PTT]').click();await page.locator('[name=qty]').fill('444');await page.locator('#holding-form [type=submit]').click();await page.waitForSelector('#login-form');
+  await page.locator('[data-edit=AAPL]').click();await page.locator('[name=qty]').fill('444');await page.locator('#holding-form [type=submit]').click();await page.waitForSelector('#login-form');
   assert.equal(await page.locator('#main').innerHTML(),'');
   await page.locator('[name=email]').fill('ui@example.com');await page.locator('[name=password]').fill('strong-test-password');await page.locator('#login-form [type=submit]').click();await page.waitForSelector('body:not(.signed-out)');
   await page.locator('.sidebar [data-logout]').click();await page.waitForSelector('#login-form');

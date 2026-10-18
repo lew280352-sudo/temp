@@ -12,7 +12,7 @@ docs/               คู่มือและจุดบอด
 backups/            สำเนาฐานข้อมูล (ไม่ขึ้น Git)
 ```
 
-ต้องใช้ Node.js 24+; runtime ใช้ built-in modules ไม่มี npm production dependency ติดตั้ง dev dependency ด้วย `npm ci` เมื่อต้องทดสอบ UI
+ต้องใช้ Node.js 24+; ใช้ `npm ci` ติดตั้งแพ็กเกจตาม lockfile (รวม fast-xml-parser สำหรับ RSS) หรือ `npm ci --omit=dev` เฉพาะ runtime
 
 ## ค่าตั้งต้น
 
@@ -22,9 +22,10 @@ backups/            สำเนาฐานข้อมูล (ไม่ขึ�
 | `PORT` | `4173` | พอร์ต 1–65535 |
 | `APP_ORIGIN` | origin localhost ตาม request | origin ของเว็บ เช่น `https://your-domain.example` ไม่มี path/query/credentials |
 | `DATABASE_PATH` | `.data/stocklens.sqlite` ใต้โฟลเดอร์แอป | path ฐานข้อมูล persistent |
+| `NEWS_ENABLED` | `true` | ตั้ง `false` เพื่อปิดการดึง RSS; cache เดิมยังอ่านได้พร้อมสถานะอายุ |
 | `BROWSER_PATH` | Edge บน Windows / Playwright Chromium บนระบบอื่น | ใช้เฉพาะ browser tests |
 
-`npm start` อ่าน environment ของ process ไม่โหลด `.env` อัตโนมัติ หากใช้ `.env` ให้คัดลอก `.env.example` แล้วรัน `node --env-file=.env server.mjs` ห้าม commit `.env`
+`npm start` และ `npm run backup` โหลด `.env` ถ้ามี โดย environment ที่ตั้งใน process มีลำดับก่อน คัดลอก `.env.example` ไป `.env` เพื่อปรับค่า ห้าม commit `.env` หากเรียก `node server.mjs` โดยตรงต้องตั้ง env เอง
 
 ## สำรองข้อมูล
 
@@ -75,7 +76,11 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 
 | Method / Path | ข้อมูล / พฤติกรรม |
 | --- | --- |
-| `POST /api/register` | `{name,email,password}` สร้างบัญชี ยังไม่สร้าง session |
+| `POST /api/register` | `{name,email,password}` สร้างบัญชีและคืน recoveryCode ครั้งเดียว ยังไม่สร้าง session |
+| `POST /api/recover` | `{email,code,password}` ใช้รหัสกู้คืน เปลี่ยนรหัสผ่าน ออกทุกเซสชัน คืน recoveryCode ใหม่ |
+| `POST /api/recovery-code` | Login + `{password}` สร้างรหัสกู้คืนใหม่ ยกเลิกรหัสเดิม |
+| `GET /api/news` | Login; ข่าวจากฟีดที่เปิดในบัญชี พร้อม source status/timestamps |
+| `GET /api/health` | ตรวจ process/SQLite เท่านั้น ไม่ยืนยันว่า provider ภายนอกพร้อม |
 | `POST /api/login` | `{email,password}` รับ `{user,state,revision}` และ HttpOnly session cookie |
 | `GET /api/session` | คืน user/state/revision ของ session หรือ user=null |
 | `PUT /api/state` | `{userId,revision,state}` ตรวจสิทธิ์และ revision; คืน state ที่ normalize แล้วและ revision ใหม่ |
@@ -84,7 +89,7 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 
 คำขอเปลี่ยนข้อมูลต้องส่ง `Content-Type: application/json` และ Origin ตรงกับเว็บ ไม่ใช่ API integration ภายนอกสำหรับ Custom GPT; หากทำ GPT Actions ต้องออกแบบ authentication เฉพาะ ไม่ให้ใช้ cookie ของผู้ใช้แทน OAuth/API credentials
 
-ข้อผิดพลาดหลัก: 400 input ไม่ถูกต้อง, 401 session ไม่พร้อม, 403 origin/host ไม่ตรง, 409 บัญชี/ข้อมูลขัดแย้ง, 413 body เกิน 64 KiB, 415 Content-Type ผิด, 429 ลอง auth เกิน 10 ครั้งต่อบัญชี+IP หรือเกิน 200 ครั้งรวมต่อ IP ใน 15 นาที (รวม Register และ Login ทั้งที่สำเร็จและล้มเหลว)
+ข้อผิดพลาดหลัก: 400 input ไม่ถูกต้อง, 401 session ไม่พร้อม, 403 origin/host ไม่ตรง, 409 บัญชี/ข้อมูลขัดแย้ง, 413 body เกิน 64 KiB, 415 Content-Type ผิด, 429 ลอง auth เกิน 10 ครั้งต่อบัญชี+IP หรือเกิน 200 ครั้งรวมต่อ IP ใน 15 นาที (รวม Register, Login, Recover และการสร้างรหัสกู้คืน ทั้งที่สำเร็จและล้มเหลว)
 
 ## การทดสอบและ CI
 
@@ -92,6 +97,7 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 npm.cmd ci
 npm.cmd test
 npm.cmd run test:ui
+npm.cmd run test:pwa
 npm.cmd run test:users
 ```
 
@@ -100,3 +106,21 @@ API tests ตรวจ session, account isolation, revision conflict, input vali
 `test:users` เปิด browser contexts แยก 20 บัญชีพร้อมกัน (10 desktop, 10 mobile) และฐานข้อมูล SQLite ใหม่เฉพาะรอบ บันทึก `results.json` และภาพตัวอย่างใน `test-artifacts/users20-verified-<เวลา UTC>/` โฟลเดอร์นี้รวมฐานข้อมูลสังเคราะห์สำหรับตรวจสอบและถูก ignore จาก Git ไม่ใช้ `.data/stocklens.sqlite` ของบัญชีจริง รายงานสรุปที่เผยแพร่อยู่ใน [TEST_20_USERS.md](TEST_20_USERS.md)
 
 GitHub Actions มี configuration สำหรับ Ubuntu + Node 24 + Chromium ผลการรันจริงดูที่หน้า Actions ใน repository ยังไม่มี deploy job เพราะต้องเลือกและตั้ง host ที่รองรับ backend ก่อน
+
+## RSS และ PWA
+
+`feeds.mjs` กำหนดปลายทางคงที่ 3 แห่ง รองรับ RSS/Atom, จำกัด 2 MiB/ฟีด, timeout 12 วินาที, ไม่ตาม redirect และปฏิเสธ DOCTYPE/ENTITY เพื่อไม่ resolve XML entity จากภายนอก อ่านเฉพาะ title/link/date ไม่โหลดบทความเต็ม URL ที่ผู้ใช้กรอกไม่เป็นปลายทาง fetch
+
+ดึงตอนเริ่ม server แล้วทุก 15 นาที เก็บ `news_feeds` ใน SQLite รวมใน backup เมื่อดึงไม่สำเร็จเก็บ cache เดิมและตั้ง error หากเวลาสำเร็จล่าสุดเกินหนึ่งชั่วโมงจะระบุว่าล่าช้า ปุ่มรีเฟรชใน UI อ่าน cache ไม่สร้าง upstream request ต่อผู้ใช้ แต่ละบริษัทอาจเผยแพร่ข่าวห่างกันและไม่จำเป็นต้องใหม่ทุกวัน
+
+Service worker cache เฉพาะ `/offline.html` และไอคอน ไม่ cache `/api/*`, HTML ที่ Login แล้ว หรือข้อมูลส่วนตัว เปลี่ยนเลข cache version ใน `dist/sw.js` หากเปลี่ยนหน้าที่ precache ไม่ใช้ skipWaiting จึงไม่บังคับเปลี่ยน worker ระหว่างผู้ใช้กรอกฟอร์ม
+
+## Docker (ยังไม่ได้ทดสอบ build บนเครื่องนี้)
+
+ติดตั้ง Docker แล้วรัน `docker compose up -d --build` จากโฟลเดอร์แอป เปิด **http://localhost:4173** (ต้องใช้ hostname ตรง APP_ORIGIN) compose ผูกพอร์ตกับ loopback และเก็บ SQLite ใน named volume `stocklens-data` รันเป็นผู้ใช้ node ที่ไม่ใช่ root
+
+สำรอง volume โดย `docker compose exec stocklens node scripts/backup.mjs` แล้วคัดลอกไฟล์ backup ออกมาจาก `/app/backups` ก่อนลบ container ห้ามใช้ `docker compose down -v` หากยังไม่มี backup เพราะจะลบข้อมูลใน volume
+
+สำหรับอินเทอร์เน็ต ให้ reverse proxy HTTPS เข้ามาที่พอร์ต loopback นี้ ตั้ง APP_ORIGIN เป็น https://โดเมนจริง แล้ว rebuild/recreate container ตามระบบ deploy อย่าเปิดหลาย replica บน SQLite ไฟล์เดียวกัน ทั้ง Docker และ reverse proxy ยังไม่ได้เผยแพร่หรือสร้างบัญชีโฮสต์ให้อัตโนมัติ
+
+อ้างอิง: [Docker Node.js guide](https://docs.docker.com/guides/nodejs/), [Node environment files](https://nodejs.org/api/cli.html#--env-file-if-existsfile), [PWA installation](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable)

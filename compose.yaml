@@ -1,0 +1,13 @@
+services:
+  stocklens:
+    build: .
+    restart: unless-stopped
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:4173}
+      NEWS_ENABLED: ${NEWS_ENABLED:-true}
+    ports:
+      - "127.0.0.1:4173:4173"
+    volumes:
+      - stocklens-data:/app/.data
+volumes:
+  stocklens-data:

@@ -1,0 +1,12 @@
+node_modules
+.git
+.data
+backups
+test-artifacts
+.env
+.env.*
+.openai
+test
+docs
+*.sqlite*
+*.log

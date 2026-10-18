@@ -5,18 +5,16 @@ import { promisify } from 'node:util';
 import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { companies } from './dist/catalog.js';
+import { feeds, createNewsService } from './feeds.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const deriveKey = promisify(scrypt);
 const SESSION_AGE = 12 * 60 * 60 * 1000;
-const symbols = new Set(['PTT','ADVANC','CPALL','KBANK','AOT','SCB']);
-const defaultSources = [
-  {id:'set',name:'SET · ข่าวบริษัทจดทะเบียน',url:'https://www.set.or.th/th/market/news-and-alert/news?newsType=company',type:'finance',symbol:'',enabled:true},
-  {id:'ptt',name:'PTT · นักลงทุนสัมพันธ์',url:'https://investor.pttplc.com/en/ir-home',type:'company',symbol:'PTT',enabled:true},
-  {id:'ais',name:'AIS · นักลงทุนสัมพันธ์',url:'https://investor.ais.co.th/en/home',type:'company',symbol:'ADVANC',enabled:true}
-];
+// Preserve existing Thai holdings without interpreting their THB costs as USD.
+const symbols = new Set([...companies.map(c=>c.symbol),'PTT','ADVANC','CPALL','KBANK','AOT','SCB']);
 export function initialState() {
-  return {holdings:[],alerts:{daily:true,news:true,trend:true,time:'08:00',scope:'portfolio'},sources:structuredClone(defaultSources)};
+  return {holdings:[],alerts:{daily:true,news:true,trend:true,time:'08:00',scope:'portfolio'},sources:feeds.map(f=>({id:f.id,name:f.name,url:f.url,type:'company',symbol:f.symbol,enabled:true}))};
 }
 class HttpError extends Error { constructor(status,message){super(message);this.status=status;} }
 function fail(status,message){throw new HttpError(status,message);}
@@ -27,10 +25,10 @@ export function normalizeSourceUrl(value){
   url.hash='';return url.href;
 }
 function validateState(input){
-  if(!input||!Array.isArray(input.holdings)||input.holdings.length>6)fail(400,'ข้อมูลพอร์ตไม่ถูกต้อง');
+  if(!input||!Array.isArray(input.holdings)||input.holdings.length>symbols.size)fail(400,'ข้อมูลพอร์ตไม่ถูกต้อง');
   const seen=new Set();
   const holdings=input.holdings.map(h=>{
-    if(!h||!symbols.has(h.symbol)||seen.has(h.symbol)||!Number.isInteger(h.qty)||h.qty<1||h.qty>1e9||!Number.isFinite(h.cost)||h.cost<0||h.cost>1e7)fail(400,'จำนวนหุ้นหรือต้นทุนไม่ถูกต้อง');
+    if(!h||!symbols.has(h.symbol)||seen.has(h.symbol)||!Number.isFinite(h.qty)||h.qty<0.000001||h.qty>1e9||Math.abs(h.qty*1e6-Math.round(h.qty*1e6))>0.001||!Number.isFinite(h.cost)||h.cost<0||h.cost>1e7)fail(400,'จำนวนหุ้นหรือต้นทุนไม่ถูกต้อง');
     seen.add(h.symbol);return {symbol:h.symbol,qty:h.qty,cost:h.cost};
   });
   const a=input.alerts;
@@ -54,7 +52,7 @@ async function passwordHash(password,salt){return deriveKey(password,salt,64,{N:
 const tokenHash=token=>createHash('sha256').update(token).digest('hex');
 function tokenFrom(req){return (req.headers.cookie||'').split(';').map(c=>c.trim()).find(c=>c.startsWith('stocklens_session='))?.slice(18)||'';}
 
-export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null}={}){
+export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch}={}){
   if(publicOrigin){
     let url;try{url=new URL(publicOrigin);}catch{throw new Error('APP_ORIGIN must be an http(s) origin');}
     if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('APP_ORIGIN must contain only scheme, hostname and optional port');
@@ -68,6 +66,10 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
     CREATE TABLE IF NOT EXISTS user_state(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,data TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS session_expiry ON sessions(expires_at);`);
   if(!db.prepare('PRAGMA table_info(user_state)').all().some(column=>column.name==='revision'))db.exec('ALTER TABLE user_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 0');
+  db.exec('CREATE TABLE IF NOT EXISTS recovery_codes(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,code_hash TEXT NOT NULL)');
+  const news=createNewsService(db,{fetcher:newsFetcher});
+  let newsTimer;
+  const newRecoveryCode=()=>randomBytes(24).toString('hex');
   const attempts=new Map();
   const cookie=(token,age)=>`stocklens_session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secureCookies?'; Secure':''}`;
   const send=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(data));};
@@ -94,6 +96,13 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       const origin=publicOrigin||`http://${req.headers.host}`;
       if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origin)fail(403,'คำขอไม่ได้มาจากเว็บไซต์นี้');
       const pathname=new URL(req.url,origin).pathname;
+      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.3.0'});}
+      if(pathname==='/api/news'&&req.method==='GET'){
+        const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
+        const snapshot=news.snapshot(),sources=userData(user).state.sources;
+        const enabled=new Set(snapshot.sources.filter(feed=>sources.some(source=>source.enabled&&source.url.replace(/\/$/,'')===feed.url.replace(/\/$/,''))).map(feed=>feed.id));
+        return send(res,200,{...snapshot,items:snapshot.items.filter(item=>enabled.has(item.feedId)),sources:snapshot.sources.map(feed=>({...feed,enabled:enabled.has(feed.id)}))});
+      }
       if(pathname==='/api/session'&&req.method==='GET'){
         return send(res,200,userData(currentUser(req)));
       }
@@ -105,11 +114,38 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254||name.length<2||name.length>80||typeof input.password!=='string'||input.password.length<10||input.password.length>128)fail(400,'กรอกชื่อ อีเมล และรหัสผ่าน 10–128 ตัวอักษรให้ถูกต้อง');
         const salt=randomBytes(16).toString('hex'),hash=(await passwordHash(input.password,salt)).toString('hex'),id=randomUUID();
         if(db.prepare('SELECT id FROM users WHERE email=?').get(email))fail(409,'อีเมลนี้ถูกใช้แล้ว กรุณาเข้าสู่ระบบ');
+        const recoveryCode=newRecoveryCode();
         db.exec('BEGIN');try{
           db.prepare('INSERT INTO users VALUES(?,?,?,?,?,?)').run(id,email,name,salt,hash,Date.now());
-          db.prepare('INSERT INTO user_state(user_id,data) VALUES(?,?)').run(id,JSON.stringify(initialState()));db.exec('COMMIT');
+          db.prepare('INSERT INTO user_state(user_id,data) VALUES(?,?)').run(id,JSON.stringify(initialState()));
+          db.prepare('INSERT INTO recovery_codes VALUES(?,?)').run(id,tokenHash(recoveryCode));db.exec('COMMIT');
         }catch(error){db.exec('ROLLBACK');throw error;}
-        return send(res,201,{message:'สร้างบัญชีแล้ว กรุณาเข้าสู่ระบบ'});
+        return send(res,201,{message:'สร้างบัญชีแล้ว กรุณาเข้าสู่ระบบ',recoveryCode});
+      }
+      if(pathname==='/api/recover'&&req.method==='POST'){
+        const input=await body(req),email=typeof input.email==='string'?input.email.trim().toLowerCase():'';limit(req,email);
+        if(typeof input.password!=='string'||input.password.length<10||input.password.length>128)fail(400,'รหัสผ่านใหม่ต้องยาว 10–128 ตัวอักษร');
+        const user=db.prepare('SELECT u.id,r.code_hash FROM users u JOIN recovery_codes r ON r.user_id=u.id WHERE u.email=?').get(email);
+        const supplied=typeof input.code==='string'?input.code.trim().toLowerCase():'';
+        if(!user||!timingSafeEqual(Buffer.from(tokenHash(supplied),'hex'),Buffer.from(user.code_hash,'hex')))fail(401,'อีเมลหรือรหัสกู้คืนไม่ถูกต้อง');
+        const salt=randomBytes(16).toString('hex'),hash=(await passwordHash(input.password,salt)).toString('hex'),recoveryCode=newRecoveryCode();
+        db.exec('BEGIN');try{
+          const changed=db.prepare('UPDATE recovery_codes SET code_hash=? WHERE user_id=? AND code_hash=?').run(tokenHash(recoveryCode),user.id,user.code_hash);
+          if(!changed.changes)fail(401,'รหัสกู้คืนนี้ถูกใช้แล้ว');
+          db.prepare('UPDATE users SET salt=?,password_hash=? WHERE id=?').run(salt,hash,user.id);
+          db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);db.exec('COMMIT');
+        }catch(error){db.exec('ROLLBACK');throw error;}
+        res.setHeader('Set-Cookie',cookie('',0));return send(res,200,{ok:true,recoveryCode});
+      }
+      if(pathname==='/api/recovery-code'&&req.method==='POST'){
+        const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
+        const input=await body(req);limit(req,user.email);
+        if(typeof input.password!=='string'||input.password.length>128)fail(401,'รหัสผ่านไม่ถูกต้อง');
+        const row=db.prepare('SELECT salt,password_hash FROM users WHERE id=?').get(user.id);
+        const hash=await passwordHash(input.password,row.salt);
+        if(!timingSafeEqual(hash,Buffer.from(row.password_hash,'hex'))||currentUser(req)?.id!==user.id)fail(401,'รหัสผ่านไม่ถูกต้องหรือเซสชันหมดอายุ');
+        const recoveryCode=newRecoveryCode();db.prepare('INSERT INTO recovery_codes VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET code_hash=excluded.code_hash').run(user.id,tokenHash(recoveryCode));
+        return send(res,200,{recoveryCode});
       }
       if(pathname==='/api/login'&&req.method==='POST'){
         const input=await body(req),email=typeof input.email==='string'?input.email.trim().toLowerCase():'';
@@ -117,7 +153,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         if(typeof input.password!=='string'||input.password.length>128)fail(401,'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
         const user=db.prepare('SELECT * FROM users WHERE email=?').get(email);
         const hash=await passwordHash(input.password,user?.salt||'0'.repeat(32));
-        if(!user||!timingSafeEqual(hash,Buffer.from(user.password_hash,'hex')))fail(401,'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+        if(!user||!timingSafeEqual(hash,Buffer.from(user.password_hash,'hex'))||db.prepare('SELECT password_hash FROM users WHERE id=?').get(user.id)?.password_hash!==user.password_hash)fail(401,'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
         db.prepare('DELETE FROM sessions WHERE expires_at<=? OR token_hash=?').run(Date.now(),tokenHash(tokenFrom(req)));
         const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(tokenHash(token),user.id,Date.now()+SESSION_AGE);
         res.setHeader('Set-Cookie',cookie(token,SESSION_AGE/1000));
@@ -143,20 +179,21 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         return send(res,200,{format:'stocklens-export-v1',exportedAt:new Date().toISOString(),...userData(user)});
       }
       if(pathname.startsWith('/api/'))fail(404,'ไม่พบ API นี้');
-      const assets={'/':['index.html','text/html'],'/index.html':['index.html','text/html'],'/app.js':['app.js','text/javascript'],'/auth.js':['auth.js','text/javascript'],'/styles.css':['styles.css','text/css'],'/theme.css':['theme.css','text/css']};
+      const assets={'/':['index.html','text/html'],'/index.html':['index.html','text/html'],'/app.js':['app.js','text/javascript'],'/auth.js':['auth.js','text/javascript'],'/styles.css':['styles.css','text/css'],'/theme.css':['theme.css','text/css'],'/catalog.js':['catalog.js','text/javascript'],'/pwa.js':['pwa.js','text/javascript'],'/sw.js':['sw.js','text/javascript'],'/manifest.webmanifest':['manifest.webmanifest','application/manifest+json'],'/offline.html':['offline.html','text/html'],'/icon.svg':['icon.svg','image/svg+xml'],'/icon-192.png':['icon-192.png','image/png'],'/icon-512.png':['icon-512.png','image/png'],'/apple-touch-icon.png':['apple-touch-icon.png','image/png']};
       const asset=assets[pathname];if(!asset||!['GET','HEAD'].includes(req.method))fail(404,'ไม่พบหน้าเว็บ');
       const data=readFileSync(path.join(root,'dist',asset[0]));res.writeHead(200,{'Content-Type':asset[1]+'; charset=utf-8'});res.end(req.method==='HEAD'?undefined:data);
     }catch(error){send(res,error.status||500,{error:error.status?error.message:'ระบบขัดข้อง กรุณาลองใหม่'});if(!error.status)console.error(error.message);}
   });
   server.requestTimeout=15000;server.headersTimeout=10000;
-  server.on('close',()=>db.close());
+  if(refreshNews){server.once('listening',()=>{news.refresh().catch(()=>{});newsTimer=setInterval(()=>news.refresh().catch(()=>{}),15*60*1000);newsTimer.unref();});}
+  server.on('close',()=>{clearInterval(newsTimer);news.close();db.close();});
   return server;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const port=Number(process.env.PORT||4173),host=process.env.HOST||'127.0.0.1';
   if(!Number.isInteger(port)||port<1||port>65535)throw new Error('PORT must be an integer from 1 to 65535');
   if(!['127.0.0.1','localhost','::1'].includes(host)&&!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN before listening beyond localhost');
-  const server=createApp({databasePath:process.env.DATABASE_PATH?path.resolve(process.env.DATABASE_PATH):undefined,publicOrigin:process.env.APP_ORIGIN||null});
+  const server=createApp({databasePath:process.env.DATABASE_PATH?path.resolve(process.env.DATABASE_PATH):undefined,publicOrigin:process.env.APP_ORIGIN||null,refreshNews:process.env.NEWS_ENABLED!=='false'});
   server.listen(port,host,()=>console.log(`StockLens: http://${host}:${server.address().port}`));
   server.on('error',error=>{console.error(error.code==='EADDRINUSE'?`พอร์ต ${port} ถูกใช้อยู่แล้ว ตั้งค่า PORT เป็นหมายเลขอื่น`:error.message);process.exitCode=1;});
   for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{server.close();server.closeIdleConnections();});
