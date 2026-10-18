@@ -1,0 +1,16 @@
+node_modules/
+.data/
+.env
+.env.*
+!.env.example
+test-artifacts/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.openai/
+backups/
+*.db
+*.db-shm
+*.db-wal
+*.log
+.DS_Store

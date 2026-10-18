@@ -1,0 +1,71 @@
+let authMode='register',authBusy=false;
+async function api(url,{method='GET',body:payload}={}){
+  let response;try{response=await fetch(url,{method,credentials:'same-origin',signal:AbortSignal.timeout(20000),headers:payload?{'Content-Type':'application/json'}:undefined,body:payload?JSON.stringify(payload):undefined});}catch{throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจว่าเปิด StockLens อยู่');}
+  let result;try{result=await response.json();}catch{throw new Error('เซิร์ฟเวอร์ยังไม่พร้อม กรุณาเปิดแอปผ่าน npm start');}
+  if(!response.ok){const error=new Error(result.error||'ดำเนินการไม่สำเร็จ');error.status=response.status;throw error;}return result;
+}
+function authForm(mode,message='',email=''){
+  authMode=mode;const register=mode==='register';
+  $('#auth-content').innerHTML=`<div class="auth-tabs" role="group" aria-label="เลือกสมัครสมาชิกหรือเข้าสู่ระบบ"><button data-auth-mode="register" class="${register?'active':''}" aria-pressed="${register}">สร้างบัญชี / Register</button><button data-auth-mode="login" class="${!register?'active':''}" aria-pressed="${!register}">เข้าสู่ระบบ / Login</button></div>${message?`<div class="auth-success" role="status">${escapeHtml(message)}</div>`:''}<h2>${register?'เริ่มต้นมองหุ้นในมุมของคุณ':'ยินดีต้อนรับกลับมา'}</h2><p class="auth-description">${register?'สร้างบัญชีเพื่อจัดพอร์ตและรวบรวมแหล่งข่าว<br>ที่เกี่ยวข้องกับบริษัทที่คุณสนใจ':'เข้าสู่ระบบเพื่อกลับไปยังพอร์ต<br>และแหล่งข้อมูลที่คุณบันทึกไว้'}</p><form class="auth-form" id="${register?'register-form':'login-form'}">${register?'<label class="field">ชื่อที่แสดง<input name="name" autocomplete="name" minlength="2" maxlength="80" placeholder="ชื่อของคุณ" required></label>':''}<label class="field">อีเมล<input name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com" value="${escapeHtml(email)}" required></label><label class="field">รหัสผ่าน<span class="password-input"><input name="password" id="auth-password" type="password" autocomplete="${register?'new-password':'current-password'}" ${register?'minlength="10"':''} maxlength="128" placeholder="${register?'สร้างรหัสผ่านอย่างน้อย 10 ตัวอักษร':'กรอกรหัสผ่านของคุณ'}" required><button type="button" data-password-toggle="auth-password" aria-label="แสดงรหัสผ่าน" aria-pressed="false">แสดง</button></span>${register?'<small>ใช้รหัสผ่าน 10–128 ตัวอักษร</small>':''}</label>${register?'<label class="field">ยืนยันรหัสผ่าน<span class="password-input"><input name="confirm" id="auth-confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" placeholder="กรอกรหัสผ่านอีกครั้ง" required><button type="button" data-password-toggle="auth-confirm" aria-label="แสดงรหัสผ่านยืนยัน" aria-pressed="false">แสดง</button></span></label>':''}<p class="form-error" id="auth-error" role="alert"></p><button class="btn primary" type="submit">${register?'สร้างบัญชีของฉัน':'เข้าสู่ระบบ'} ${icon('arrow')}</button></form><div class="auth-bottom">${register?'มีบัญชีอยู่แล้ว?':'ยังไม่มีบัญชี?'} <button data-auth-mode="${register?'login':'register'}">${register?'เข้าสู่ระบบ':'สร้างบัญชีใหม่'}</button></div>`;
+}
+function showSignedOut(mode='register',message='',email=''){
+  currentUser=null;stateRevision=0;state=structuredClone(defaults);committedState=structuredClone(defaults);query='';newsFilter='all';selectedStock='PTT';
+  if($('#modal').open)$('#modal').close();$('#modal-body').innerHTML='';$('#main').innerHTML='';
+  document.querySelectorAll('[data-user-name],[data-user-email],[data-user-avatar]').forEach(el=>el.textContent='');
+  document.body.classList.add('signed-out');history.replaceState(null,'','#'+mode);authForm(mode,message,email);window.scrollTo(0,0);
+}
+function enterApp(result){
+  currentUser=result.user;state=result.state;stateRevision=result.revision;committedState=structuredClone(state);selectedStock=state.holdings[0]?.symbol||'PTT';
+  document.querySelectorAll('[data-user-name]').forEach(el=>el.textContent=currentUser.name);
+  document.querySelectorAll('[data-user-email]').forEach(el=>el.textContent=currentUser.email);
+  document.querySelectorAll('[data-user-avatar]').forEach(el=>el.textContent=Array.from(currentUser.name)[0].toUpperCase());
+  const requested=location.hash.slice(1);
+  $('#auth-content').innerHTML='';document.body.classList.remove('signed-out');navigate(['overview','news','portfolio','insights','search','alerts','sources'].includes(requested)?requested:'overview');
+}
+function renderSourceManager(){
+  const typeNames={company:'เว็บไซต์บริษัท',partner:'บริษัทคู่ค้า',finance:'แหล่งข่าวการเงิน'};
+  return header('แหล่งข้อมูลของฉัน','เพิ่ม URL บริษัท คู่ค้า หรือเว็บข่าวที่คุณต้องการติดตาม')+`<div class="info-box">บันทึก URL และเปิดเว็บไซต์ต้นทางได้แล้ว · ยังไม่ได้ดึงเนื้อหาหรือสรุปข่าวจาก URL อัตโนมัติ</div><div class="source-layout"><section class="card"><div class="sources-summary"><h2>เว็บไซต์ที่ติดตาม</h2><span>${state.sources.length} เว็บไซต์ · ${state.sources.filter(s=>s.enabled).length} รายการที่เลือก</span></div>${state.sources.map(s=>`<article class="source-entry"><div class="source-entry-top"><span class="source-initial">${escapeHtml(s.name.slice(0,2).toUpperCase())}</span><div class="source-description"><h3 class="source-title">${escapeHtml(s.name)}</h3><a class="source-url" href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.url)} ↗</a></div><input class="switch" type="checkbox" data-source-toggle="${escapeHtml(s.id)}" aria-label="ติดตาม ${escapeHtml(s.name)}" ${s.enabled?'checked':''}></div><div class="source-entry-bottom"><span>${typeNames[s.type]}</span>${s.symbol?`<span>${s.symbol}</span>`:''}<span>บันทึก URL แล้ว</span><button class="remove" data-source-remove="${escapeHtml(s.id)}">ลบ</button></div></article>`).join('')||'<div class="empty">ยังไม่มีเว็บไซต์ที่ติดตาม<br>เริ่มเพิ่ม URL เว็บไซต์แรกได้เลย</div>'}</section><form id="source-form" class="card source-form"><h2>เพิ่มเว็บไซต์</h2><label class="field">ชื่อแหล่งข้อมูล<input name="name" maxlength="100" placeholder="เช่น ข่าวบริษัท หรือเว็บไซต์คู่ค้า" required></label><label class="field">URL เว็บไซต์<input name="url" type="url" maxlength="2048" placeholder="https://example.com/news" required></label><label class="field">ประเภทแหล่งข้อมูล<select name="type"><option value="company">เว็บไซต์บริษัท</option><option value="partner">บริษัทคู่ค้า</option><option value="finance">แหล่งข่าวการเงิน</option></select></label><label class="field">หุ้นที่เกี่ยวข้อง<select name="symbol"><option value="">ภาพรวม / ไม่ระบุหุ้น</option>${stocks.map(s=>`<option value="${s.symbol}">${s.symbol}</option>`).join('')}</select></label><p class="form-error" id="source-error" role="alert"></p><button class="btn primary" type="submit">${icon('plus')} บันทึกเว็บไซต์</button><p class="form-help" style="margin-top:13px">รายการนี้บันทึกแยกตามบัญชีของคุณ<br>เพิ่มได้สูงสุด 50 เว็บไซต์</p></form></div>`;
+}
+document.addEventListener('click',async e=>{
+  const button=e.target.closest('button');if(!button)return;
+  if(button.dataset.authMode&&!authBusy){authForm(button.dataset.authMode);history.replaceState(null,'','#'+button.dataset.authMode);}
+  if(button.dataset.passwordToggle){const input=document.getElementById(button.dataset.passwordToggle),show=input.type==='password';input.type=show?'text':'password';button.textContent=show?'ซ่อน':'แสดง';button.setAttribute('aria-pressed',String(show));button.setAttribute('aria-label',show?'ซ่อนรหัสผ่าน':'แสดงรหัสผ่าน');}
+  if(button.hasAttribute('data-logout')&&currentUser&&!authBusy){
+    if(isSaving){toast('กำลังบันทึกข้อมูล กรุณารอสักครู่');return;}authBusy=true;button.disabled=true;
+    try{await api('/api/logout',{method:'POST',body:{}});showSignedOut('login','ออกจากระบบเรียบร้อยแล้ว');}catch(error){toast(error.message);}finally{authBusy=false;button.disabled=false;}
+  }
+  if(button.dataset.sourceRemove&&currentUser&&!isSaving){const s=state.sources.find(v=>v.id===button.dataset.sourceRemove);if(!s)return;openModal('ลบแหล่งข้อมูล',`<p>นำ ${escapeHtml(s.name)} ออกจากรายการเว็บไซต์ที่ติดตาม?</p><button class="btn primary" data-source-confirm="${escapeHtml(s.id)}">ยืนยันลบเว็บไซต์</button>`);}
+  if(button.dataset.sourceConfirm&&currentUser&&!isSaving){state.sources=state.sources.filter(s=>s.id!==button.dataset.sourceConfirm);if(await save()){if($('#modal').open)$('#modal').close();render();toast('ลบแหล่งข้อมูลแล้ว');}}
+});
+document.addEventListener('change',async e=>{
+  const id=e.target.dataset.sourceToggle;if(!id||!currentUser)return;if(isSaving){e.target.checked=!e.target.checked;return;}
+  const source=state.sources.find(s=>s.id===id);if(!source)return;source.enabled=e.target.checked;const ok=await save();render();if(ok)toast(source.enabled?'เลือกติดตามเว็บไซต์นี้แล้ว':'พักการติดตามเว็บไซต์นี้แล้ว');
+});
+document.addEventListener('submit',async e=>{
+  const form=e.target;
+  if(['register-form','login-form'].includes(form.id)){
+    e.preventDefault();if(authBusy)return;const register=form.id==='register-form',errorEl=$('#auth-error');errorEl.textContent='';
+    if(register&&form.elements.password.value!==form.elements.confirm.value){errorEl.textContent='รหัสผ่านทั้งสองช่องไม่ตรงกัน';form.elements.confirm.focus();return;}
+    authBusy=true;const button=form.querySelector('[type=submit]'),original=button.innerHTML;button.disabled=true;button.textContent=register?'กำลังสร้างบัญชี…':'กำลังเข้าสู่ระบบ…';
+    try{const email=form.elements.email.value;const result=await api(register?'/api/register':'/api/login',{method:'POST',body:{email,password:form.elements.password.value,...(register?{name:form.elements.name.value}:{})}});if(register){authForm('login','สร้างบัญชีแล้ว เข้าสู่ระบบเพื่อเริ่มใช้งาน',email);history.replaceState(null,'','#login');$('#auth-password').focus();}else enterApp(result);}
+    catch(error){errorEl.textContent=error.message;}finally{authBusy=false;button.disabled=false;button.innerHTML=original;}
+  }
+  if(form.id==='source-form'){
+    e.preventDefault();if(!currentUser||isSaving)return;const errorEl=$('#source-error');errorEl.textContent='';
+    let url;try{url=new URL(form.elements.url.value.trim());if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new Error();url.hash='';}catch{errorEl.textContent='ใช้ URL แบบ https:// หรือ http:// ที่ไม่มีรหัสผ่านในลิงก์';return;}
+    if(state.sources.some(s=>s.url===url.href)){errorEl.textContent='มี URL นี้ในรายการแล้ว';return;}
+    const button=form.querySelector('[type=submit]');button.disabled=true;
+    state.sources.push({id:crypto.randomUUID(),name:form.elements.name.value.trim(),url:url.href,type:form.elements.type.value,symbol:form.elements.symbol.value,enabled:true});
+    const ok=await save();button.disabled=false;if(ok){render();toast('บันทึก URL แล้ว · ยังไม่ได้ดึงข่าวอัตโนมัติ');}
+  }
+});
+function connectionHelp(){
+  document.body.classList.add('signed-out');$('#auth-content').innerHTML='<div class="eyebrow">START YOUR WORKSPACE</div><h2>เปิด StockLens ผ่านเซิร์ฟเวอร์</h2><p class="auth-description">ระบบสมัครสมาชิกและเข้าสู่ระบบต้องใช้เซิร์ฟเวอร์ของแอป</p><div class="auth-connection">เปิด Terminal ในโฟลเดอร์ stocklens แล้วรัน<code>npm.cmd start</code>จากนั้นเปิด <a href="http://127.0.0.1:4173">http://127.0.0.1:4173 ↗</a></div>';
+}
+async function boot(){
+  if(location.protocol==='file:'){connectionHelp();return;}
+  try{const result=await api('/api/session');if(result.user)enterApp(result);else showSignedOut(location.hash==='#login'?'login':'register');}catch{connectionHelp();}
+}
+window.addEventListener('pageshow',e=>{if(e.persisted)boot();});
+document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&currentUser&&!authBusy&&!isSaving){try{const result=await api('/api/session');if(!result.user||result.user.id!==currentUser.id)showSignedOut('login','กรุณาเข้าสู่ระบบใหม่');}catch{}}});
+boot();
