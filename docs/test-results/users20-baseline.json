@@ -1,0 +1,290 @@
+{
+  "label": "baseline",
+  "users": 20,
+  "passed": 0,
+  "failed": 20,
+  "elapsedMs": 11531,
+  "environment": {
+    "node": "v24.18.0",
+    "platform": "win32",
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12700F",
+    "browser": "installed Chromium/Edge headless",
+    "database": "isolated on-disk SQLite",
+    "network": "localhost; all 20 contexts share one IP; third-party fonts blocked"
+  },
+  "api": {
+    "count": 60,
+    "statuses": {
+      "200": 20,
+      "201": 20,
+      "429": 20
+    },
+    "successfulResponseMs": {
+      "p50": 349,
+      "p95": 2006,
+      "max": 2132
+    }
+  },
+  "results": [
+    {
+      "number": 1,
+      "device": "desktop",
+      "scenario": "เพิ่มหุ้นครั้งแรก",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 2,
+      "device": "desktop",
+      "scenario": "เพิ่มหุ้นเดิมและเฉลี่ยต้นทุน",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 3,
+      "device": "desktop",
+      "scenario": "ค้นหาภาษาไทย",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 4,
+      "device": "desktop",
+      "scenario": "ตั้งค่าการแจ้งเตือน",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 5,
+      "device": "desktop",
+      "scenario": "ป้องกันข้อมูลจากแท็บเก่า",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 6,
+      "device": "desktop",
+      "scenario": "เพิ่มหุ้นครั้งแรก",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 7,
+      "device": "desktop",
+      "scenario": "เพิ่มหุ้นเดิมและเฉลี่ยต้นทุน",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 8,
+      "device": "desktop",
+      "scenario": "ค้นหาภาษาไทย",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 9,
+      "device": "desktop",
+      "scenario": "ตั้งค่าการแจ้งเตือน",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 10,
+      "device": "desktop",
+      "scenario": "ป้องกันข้อมูลจากแท็บเก่า",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 11,
+      "device": "mobile",
+      "scenario": "เพิ่มหุ้นครั้งแรก",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 12,
+      "device": "mobile",
+      "scenario": "เพิ่มหุ้นเดิมและเฉลี่ยต้นทุน",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 13,
+      "device": "mobile",
+      "scenario": "ค้นหาภาษาไทย",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 14,
+      "device": "mobile",
+      "scenario": "ตั้งค่าการแจ้งเตือน",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 15,
+      "device": "mobile",
+      "scenario": "ป้องกันข้อมูลจากแท็บเก่า",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 16,
+      "device": "mobile",
+      "scenario": "เพิ่มหุ้นครั้งแรก",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 17,
+      "device": "mobile",
+      "scenario": "เพิ่มหุ้นเดิมและเฉลี่ยต้นทุน",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 18,
+      "device": "mobile",
+      "scenario": "ค้นหาภาษาไทย",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 19,
+      "device": "mobile",
+      "scenario": "ตั้งค่าการแจ้งเตือน",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    },
+    {
+      "number": 20,
+      "device": "mobile",
+      "scenario": "ป้องกันข้อมูลจากแท็บเก่า",
+      "stage": "login",
+      "status": "failed",
+      "checks": [
+        "open-register",
+        "register"
+      ],
+      "failure": "Login returned HTTP 429  429 !== 200",
+      "errors": []
+    }
+  ]
+}

@@ -9,6 +9,7 @@
 - [คู่มือผู้ใช้](docs/USER_GUIDE.md): สมัครบัญชี เพิ่มหุ้น URL แจ้งเตือน ส่งออกข้อมูล และแก้ปัญหา
 - [คู่มือผู้ดูแล](docs/OPERATIONS.md): ตั้งค่า สำรอง/กู้คืนฐานข้อมูล API และเตรียม deploy
 - [จุดบอดและข้อจำกัด](docs/KNOWN_LIMITATIONS.md): สิ่งที่แก้แล้วและงานที่ต้องเชื่อมต่อเพิ่ม
+- [ผลจำลองผู้ใช้ 20 คน](docs/TEST_20_USERS.md): ปัญหาที่พบ ผลก่อน–หลังแก้ และข้อจำกัดของการทดสอบ
 
 ## ดาวน์โหลดจาก GitHub
 
@@ -60,6 +61,7 @@ npm.cmd start
 npm.cmd ci
 npm.cmd test
 npm.cmd run test:ui
+npm.cmd run test:users
 ```
 
 UI tests ใช้ Microsoft Edge แบบ headless ตาม path มาตรฐานของ Windows ตั้ง `BROWSER_PATH` หากใช้ Chromium อื่น ภาพหน้าจอทดสอบอยู่ที่ `test-artifacts/` ข้อมูลทดสอบอยู่ใน memory และไม่ปะปนกับบัญชีจริง

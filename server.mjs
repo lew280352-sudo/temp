@@ -76,11 +76,14 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
     const token=tokenFrom(req);if(!/^[a-f0-9]{64}$/.test(token))return null;
     return db.prepare('SELECT u.id,u.email,u.name FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').get(tokenHash(token),Date.now())||null;
   }
-  function limit(req){
-    const now=Date.now(),key=req.socket.remoteAddress||'unknown';
-    for(const [ip,item] of attempts)if(now>item.until)attempts.delete(ip);
-    const entry=attempts.get(key)||{count:0,until:now+15*60*1000};entry.count++;attempts.set(key,entry);
-    if(entry.count>20)fail(429,'ลองเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ 15 นาที');
+  function limit(req,email){
+    const now=Date.now(),ip=req.socket.remoteAddress||'unknown';
+    for(const [key,item] of attempts)if(now>=item.until)attempts.delete(key);
+    // Shared networks need headroom; repeated attempts at one account remain limited.
+    for(const [key,maximum] of [[`ip:${ip}`,200],[`account:${ip}:${email.slice(0,254)}`,10]]){
+      const entry=attempts.get(key)||{count:0,until:now+15*60*1000};entry.count++;attempts.set(key,entry);
+      if(entry.count>maximum)fail(429,'ลองสมัครหรือเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ 15 นาที');
+    }
   }
   const server=http.createServer(async(req,res)=>{
     res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');
@@ -95,8 +98,9 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         return send(res,200,userData(currentUser(req)));
       }
       if(pathname==='/api/register'&&req.method==='POST'){
-        limit(req);const input=await body(req);
+        const input=await body(req);
         const email=typeof input.email==='string'?input.email.trim().toLowerCase():'';
+        limit(req,email);
         const name=typeof input.name==='string'?input.name.trim():'';
         if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254||name.length<2||name.length>80||typeof input.password!=='string'||input.password.length<10||input.password.length>128)fail(400,'กรอกชื่อ อีเมล และรหัสผ่าน 10–128 ตัวอักษรให้ถูกต้อง');
         const salt=randomBytes(16).toString('hex'),hash=(await passwordHash(input.password,salt)).toString('hex'),id=randomUUID();
@@ -108,7 +112,8 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         return send(res,201,{message:'สร้างบัญชีแล้ว กรุณาเข้าสู่ระบบ'});
       }
       if(pathname==='/api/login'&&req.method==='POST'){
-        limit(req);const input=await body(req),email=typeof input.email==='string'?input.email.trim().toLowerCase():'';
+        const input=await body(req),email=typeof input.email==='string'?input.email.trim().toLowerCase():'';
+        limit(req,email);
         if(typeof input.password!=='string'||input.password.length>128)fail(401,'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
         const user=db.prepare('SELECT * FROM users WHERE email=?').get(email);
         const hash=await passwordHash(input.password,user?.salt||'0'.repeat(32));

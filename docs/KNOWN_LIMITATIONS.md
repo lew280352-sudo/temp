@@ -14,6 +14,7 @@
 | ทดสอบ UI ใช้ Windows path อย่างเดียว | ใช้ Playwright Chromium บน Linux/macOS และ Edge บน Windows | Windows browser tests; Linux CI ต้องดูผลบน GitHub |
 | อาจตั้งค่า APP_ORIGIN ผิดหรือเปิด LAN โดยไม่มี origin | ตรวจค่าตอนเริ่มระบบ และให้ตั้ง APP_ORIGIN ก่อน bind นอก loopback | configuration tests |
 | ไฟล์ตั้งค่า Sites เก่าอาจติดไป GitHub | ignore `.openai/`, ฐานข้อมูล, backup, secrets, node_modules และ test artifacts | ตรวจรายการ staged ก่อน push |
+| ผู้ใช้ 20 คนอยู่ IP เดียวกันสมัครแล้ว Login ไม่ได้ | เปลี่ยนจาก 20 ครั้งรวมต่อ IP เป็น 10 ครั้งต่อบัญชี+IP และ 200 ครั้งรวมต่อ IP ใน 15 นาที | baseline ล้มเหลว 20 บัญชี; หลังแก้ flow ผ่าน 20/20 และ anti-abuse tests ผ่าน |
 
 ## ยังไม่พร้อม — งานสำคัญก่อนใช้เงินจริง
 
@@ -25,7 +26,7 @@
 | สูง | URL เป็นรายการที่บันทึกไว้ | ไม่มี crawler, RSS/API ingestion, ตรวจข่าวซ้ำ, สรุปข่าว หรือ scheduler; ไม่ได้ตรวจความจริงของเว็บที่เพิ่ม |
 | สูง | ไม่มีการยืนยันอีเมล/กู้รหัสผ่าน | ใครก็กรอกอีเมลที่ยังไม่มีบัญชีได้และผู้ใช้ที่ลืมรหัสผ่านกลับเข้าบัญชีไม่ได้ ต้องเชื่อมบริการอีเมลและ token ที่หมดอายุ |
 | กลาง | การแจ้งเตือนบันทึกค่าอย่างเดียว | ยังไม่มี push/email provider, consent flow หรือคิวส่งจริง |
-| กลาง | Rate limit เป็น memory ต่อ IP | restart แล้วล้างค่า และผู้ใช้หลัง proxy/NAT อาจแชร์โควตา ต้องออกแบบ trusted proxy และ shared limiter ก่อนหลาย instance |
+| กลาง | Rate limit เป็น memory ต่อ IP และบัญชี+IP | รองรับกลุ่ม 20 คนในกรณีที่ทดสอบแล้ว แต่ restart ล้างค่าและ proxy/NAT ยังแชร์เพดาน 200 ครั้ง/15 นาที ต้องออกแบบ trusted proxy และ shared limiter ก่อนหลาย instance |
 | กลาง | SQLite ไฟล์เดียว | เหมาะกับ single instance ที่มี persistent disk; ต้องวาง backup/restore/monitoring และย้าย DB หากหลาย instance |
 | กลาง | ไม่มี import JSON / ลบบัญชี / logout ทุกอุปกรณ์ | export ใช้เก็บข้อมูลได้แต่ยังนำกลับผ่าน UI ไม่ได้; ต้องเพิ่ม lifecycle บัญชีและการจัดการ session |
 | กลาง | พอร์ตไม่ใช่บัญชีซื้อขาย | ไม่รองรับรายการซื้อขายจริง ค่าธรรมเนียม ภาษี ปันผล corporate actions หลายสกุลเงิน หรือ realized P&L |

@@ -84,7 +84,7 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 
 คำขอเปลี่ยนข้อมูลต้องส่ง `Content-Type: application/json` และ Origin ตรงกับเว็บ ไม่ใช่ API integration ภายนอกสำหรับ Custom GPT; หากทำ GPT Actions ต้องออกแบบ authentication เฉพาะ ไม่ให้ใช้ cookie ของผู้ใช้แทน OAuth/API credentials
 
-ข้อผิดพลาดหลัก: 400 input ไม่ถูกต้อง, 401 session ไม่พร้อม, 403 origin/host ไม่ตรง, 409 บัญชี/ข้อมูลขัดแย้ง, 413 body เกิน 64 KiB, 415 Content-Type ผิด, 429 ลอง auth เกิน 20 ครั้งใน 15 นาทีต่อ IP
+ข้อผิดพลาดหลัก: 400 input ไม่ถูกต้อง, 401 session ไม่พร้อม, 403 origin/host ไม่ตรง, 409 บัญชี/ข้อมูลขัดแย้ง, 413 body เกิน 64 KiB, 415 Content-Type ผิด, 429 ลอง auth เกิน 10 ครั้งต่อบัญชี+IP หรือเกิน 200 ครั้งรวมต่อ IP ใน 15 นาที (รวม Register และ Login ทั้งที่สำเร็จและล้มเหลว)
 
 ## การทดสอบและ CI
 
@@ -92,8 +92,11 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 npm.cmd ci
 npm.cmd test
 npm.cmd run test:ui
+npm.cmd run test:users
 ```
 
 API tests ตรวจ session, account isolation, revision conflict, input validation และ export; persistence tests ตรวจ restart, password hash, expired sessions และ backup; UI tests ตรวจ flow สมาชิก พอร์ต แหล่งข้อมูล มือถือ และกรณี stale/expired session
+
+`test:users` เปิด browser contexts แยก 20 บัญชีพร้อมกัน (10 desktop, 10 mobile) และฐานข้อมูล SQLite ใหม่เฉพาะรอบ บันทึก `results.json` และภาพตัวอย่างใน `test-artifacts/users20-verified-<เวลา UTC>/` โฟลเดอร์นี้รวมฐานข้อมูลสังเคราะห์สำหรับตรวจสอบและถูก ignore จาก Git ไม่ใช้ `.data/stocklens.sqlite` ของบัญชีจริง รายงานสรุปที่เผยแพร่อยู่ใน [TEST_20_USERS.md](TEST_20_USERS.md)
 
 GitHub Actions มี configuration สำหรับ Ubuntu + Node 24 + Chromium ผลการรันจริงดูที่หน้า Actions ใน repository ยังไม่มี deploy job เพราะต้องเลือกและตั้ง host ที่รองรับ backend ก่อน
