@@ -1,5 +1,9 @@
 # คู่มือผู้ดูแลและนำขึ้นเซิร์ฟเวอร์
 
+## AI ในเครื่อง (0.4.0)
+
+ติดตั้ง Ollama และ `qwen3:8b` ตาม [LOCAL_AI.md](LOCAL_AI.md) StockLens ติดต่อเฉพาะ loopback และไม่เปิด Ollama ผ่านหน้าเว็บ ผลสรุปอยู่ในตาราง `ai_summaries` และเปลี่ยน cache key เมื่อโมเดล หุ้น หรือชุดหัวข้อข่าวเปลี่ยน การติดตั้งแบบ Docker ยังต้องออกแบบการเชื่อม container กับ Ollama เพิ่ม จึงแนะนำรัน Node โดยตรงสำหรับ Local AI รุ่นนี้
+
 ## ราคาแบบดึงเมื่อเปิดแอป (0.3.1)
 
 ตั้ง `FINNHUB_API_KEY` ใน `.env` แล้ว restart เซิร์ฟเวอร์ `GET /api/quotes` ต้อง Login และดึงเฉพาะหุ้นสหรัฐฯ ในพอร์ต ไม่รับ ticker จาก query ไม่ตั้ง scheduler สำหรับราคา ใช้ cache/attempt cooldown 60 วินาทีและรวมคำขอที่ซ้ำกัน เก็บตาราง `stock_quotes` ใน SQLite ไม่มี key ในฐานข้อมูลหรือคำตอบ API หากราคาไม่ครบ UI ไม่แสดงยอดรวมที่ทำให้เข้าใจว่าครบ ดู [คู่มือสมัครและตั้งค่า](FREE_SETUP.md)
@@ -8,6 +12,7 @@
 
 ```text
 server.mjs          HTTP API, authentication, SQLite และ static assets
+ai.mjs              ตัวเชื่อม Ollama, structured output และ summary cache
 dist/               หน้าเว็บและสคริปต์ฝั่งเบราว์เซอร์
 test/               API, persistence และ browser tests
 scripts/backup.mjs  สำรอง SQLite ด้วย online backup API
@@ -27,6 +32,9 @@ backups/            สำเนาฐานข้อมูล (ไม่ขึ�
 | `APP_ORIGIN` | origin localhost ตาม request | origin ของเว็บ เช่น `https://your-domain.example` ไม่มี path/query/credentials |
 | `DATABASE_PATH` | `.data/stocklens.sqlite` ใต้โฟลเดอร์แอป | path ฐานข้อมูล persistent |
 | `NEWS_ENABLED` | `true` | ตั้ง `false` เพื่อปิดการดึง RSS; cache เดิมยังอ่านได้พร้อมสถานะอายุ |
+| `AI_ENABLED` | `true` | ตั้ง `false` เพื่อปิด Local AI |
+| `OLLAMA_URL` | `http://127.0.0.1:11434` | endpoint Ollama; อนุญาตเฉพาะ localhost |
+| `OLLAMA_MODEL` | `qwen3:8b` | โมเดลที่ต้องมีใน `ollama list` |
 | `BROWSER_PATH` | Edge บน Windows / Playwright Chromium บนระบบอื่น | ใช้เฉพาะ browser tests |
 
 `npm start` และ `npm run backup` โหลด `.env` ถ้ามี โดย environment ที่ตั้งใน process มีลำดับก่อน คัดลอก `.env.example` ไป `.env` เพื่อปรับค่า ห้าม commit `.env` หากเรียก `node server.mjs` โดยตรงต้องตั้ง env เอง
@@ -84,6 +92,8 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 | `POST /api/recover` | `{email,code,password}` ใช้รหัสกู้คืน เปลี่ยนรหัสผ่าน ออกทุกเซสชัน คืน recoveryCode ใหม่ |
 | `POST /api/recovery-code` | Login + `{password}` สร้างรหัสกู้คืนใหม่ ยกเลิกรหัสเดิม |
 | `GET /api/news` | Login; ข่าวจากฟีดที่เปิดในบัญชี พร้อม source status/timestamps |
+| `GET /api/ai/status` | Login; ตรวจว่า Ollama และโมเดลที่ตั้งค่าไว้พร้อม |
+| `POST /api/ai/summary` | Login + `{symbol}`; สรุปหัวข้อข่าวที่เปิดในบัญชีด้วย structured output |
 | `GET /api/health` | ตรวจ process/SQLite เท่านั้น ไม่ยืนยันว่า provider ภายนอกพร้อม |
 | `POST /api/login` | `{email,password}` รับ `{user,state,revision}` และ HttpOnly session cookie |
 | `GET /api/session` | คืน user/state/revision ของ session หรือ user=null |

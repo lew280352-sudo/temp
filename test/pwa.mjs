@@ -3,7 +3,7 @@ import {once} from 'node:events';
 import assert from 'node:assert/strict';
 import {createApp} from '../server.mjs';
 import {feeds} from '../feeds.mjs';
-const server=createApp({databasePath:':memory:',quoteApiKey:'fixture-only',quoteFetcher:async url=>Response.json(url.endsWith('MSFT')?{c:0,t:0}:{c:200,t:Math.floor(Date.now()/1000)}),refreshNews:true,newsFetcher:async url=>{
+const server=createApp({databasePath:':memory:',quoteApiKey:'fixture-only',quoteFetcher:async url=>Response.json(url.endsWith('MSFT')?{c:0,t:0}:{c:200,t:Math.floor(Date.now()/1000)}),aiEnabled:true,aiFetcher:async(url)=>url.endsWith('/api/tags')?Response.json({models:[{name:'qwen3:8b'}]}):Response.json({message:{content:JSON.stringify({title:'สรุป Microsoft',summary:'หัวข้อกล่าวถึงประกาศทดสอบจากบริษัท',facts:['มีประกาศจากบริษัท'],positiveFactors:[],risks:['ข้อมูลมีเฉพาะหัวข้อ'],unknowns:['ไม่มีผลกระทบทางการเงิน'],confidence:'low'})}}),refreshNews:true,newsFetcher:async url=>{
   const feed=feeds.find(f=>f.feedUrl===url);
   return new Response(`<rss><channel><item><title><![CDATA[${feed.symbol} &lt;img src=x onerror=alert(1)&gt; test announcement]]></title><link>${feed.url}test-announcement</link><pubDate>Sun, 18 Oct 2026 08:00:00 GMT</pubDate></item></channel></rss>`);
 }});server.listen(0,'127.0.0.1');await once(server,'listening');
@@ -28,6 +28,7 @@ try{
   await page.locator('[data-source-remove=microsoft]').click();await page.locator('[data-source-confirm=microsoft]').click();await page.waitForSelector('[data-add-feed=microsoft]');
   await page.locator('[data-add-feed=microsoft]').click();await page.waitForFunction(()=>!document.querySelector('[data-add-feed=microsoft]'));
   const restored=await page.evaluate(()=>fetch('/api/news').then(r=>r.json()));assert.ok(restored.items.some(n=>n.symbol==='MSFT'));
+  await page.locator('.sidebar [data-page=insights]').click();await page.locator('#ai-symbol').selectOption('MSFT');await page.locator('[data-ai-summary]').click();await page.waitForFunction(()=>document.querySelector('.ai-trend')?.textContent.includes('สรุป Microsoft'));assert.match(await page.locator('.ai-card').innerText(),/ข้อมูลมีเฉพาะหัวข้อ/);assert.equal(await page.locator('.ai-sources a').count(),1);
   await page.locator('.topbar [data-logout]').click();await page.waitForSelector('#login-form');
   await page.locator('[data-recover]').click();await page.locator('#recover-form [name=email]').fill('pwa@example.com');await page.locator('#recover-form [name=code]').fill(code);await page.locator('#recover-form [name=password]').fill('pwa-new-password');await page.locator('#recover-form [name=confirm]').fill('pwa-new-password');await page.locator('#recover-form [type=submit]').click();await page.waitForSelector('#login-form');assert.notEqual(await page.locator('[aria-label="รหัสกู้คืน"]').inputValue(),code);
   await page.locator('#login-form [name=password]').fill('pwa-new-password');await page.locator('#login-form [type=submit]').click();await page.waitForSelector('body:not(.signed-out)');

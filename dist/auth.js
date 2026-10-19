@@ -1,6 +1,6 @@
 let authMode='register',authBusy=false;
-async function api(url,{method='GET',body:payload}={}){
-  let response;try{response=await fetch(url,{method,credentials:'same-origin',signal:AbortSignal.timeout(20000),headers:payload?{'Content-Type':'application/json'}:undefined,body:payload?JSON.stringify(payload):undefined});}catch{throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจว่าเปิด StockLens อยู่');}
+async function api(url,{method='GET',body:payload,timeout=20000}={}){
+  let response;try{response=await fetch(url,{method,credentials:'same-origin',signal:AbortSignal.timeout(timeout),headers:payload?{'Content-Type':'application/json'}:undefined,body:payload?JSON.stringify(payload):undefined});}catch{throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจว่าเปิด StockLens อยู่');}
   let result;try{result=await response.json();}catch{throw new Error('เซิร์ฟเวอร์ยังไม่พร้อม กรุณาเปิดแอปผ่าน npm start');}
   if(!response.ok){const error=new Error(result.error||'ดำเนินการไม่สำเร็จ');error.status=response.status;throw error;}return result;
 }
@@ -10,18 +10,18 @@ function authForm(mode,message='',email=''){
   if(!register)$('#auth-content').insertAdjacentHTML('beforeend','<button class="text-button recover-link" data-recover>ลืมรหัสผ่าน? ใช้รหัสกู้คืน</button>');
 }
 function showSignedOut(mode='register',message='',email=''){
-  currentUser=null;stateRevision=0;state=structuredClone(defaults);committedState=structuredClone(defaults);query='';newsFilter='all';selectedStock='AAPL';resetNews();resetQuotes();
+  currentUser=null;stateRevision=0;state=structuredClone(defaults);committedState=structuredClone(defaults);query='';newsFilter='all';selectedStock='AAPL';resetNews();resetQuotes();resetAI();
   if($('#modal').open)$('#modal').close();$('#modal-body').innerHTML='';$('#main').innerHTML='';
   document.querySelectorAll('[data-user-name],[data-user-email],[data-user-avatar]').forEach(el=>el.textContent='');
   document.body.classList.add('signed-out');history.replaceState(null,'','#'+mode);authForm(mode,message,email);window.scrollTo(0,0);
 }
 function enterApp(result){
-  currentUser=result.user;state=result.state;stateRevision=result.revision;committedState=structuredClone(state);selectedStock=state.holdings.find(h=>stocks.some(s=>s.symbol===h.symbol))?.symbol||'AAPL';resetNews();resetQuotes();
+  currentUser=result.user;state=result.state;stateRevision=result.revision;committedState=structuredClone(state);selectedStock=state.holdings.find(h=>stocks.some(s=>s.symbol===h.symbol))?.symbol||'AAPL';resetNews();resetQuotes();resetAI();
   document.querySelectorAll('[data-user-name]').forEach(el=>el.textContent=currentUser.name);
   document.querySelectorAll('[data-user-email]').forEach(el=>el.textContent=currentUser.email);
   document.querySelectorAll('[data-user-avatar]').forEach(el=>el.textContent=Array.from(currentUser.name)[0].toUpperCase());
   const requested=location.hash.slice(1);
-  $('#auth-content').innerHTML='';document.body.classList.remove('signed-out');navigate(['overview','news','portfolio','insights','search','alerts','sources'].includes(requested)?requested:'overview');loadNews();if(requested!=='portfolio')loadQuotes();
+  $('#auth-content').innerHTML='';document.body.classList.remove('signed-out');navigate(['overview','news','portfolio','insights','search','alerts','sources'].includes(requested)?requested:'overview');loadNews();loadAIStatus();if(requested!=='portfolio')loadQuotes();
 }
 const presetSources=[{id:'apple',name:'Apple Newsroom',symbol:'AAPL',url:'https://www.apple.com/newsroom/'},{id:'microsoft',name:'Microsoft News',symbol:'MSFT',url:'https://news.microsoft.com/'},{id:'nvidia',name:'NVIDIA Newsroom',symbol:'NVDA',url:'https://nvidianews.nvidia.com/'}];
 function renderSourceManager(){
