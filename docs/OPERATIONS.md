@@ -1,12 +1,12 @@
 # คู่มือผู้ดูแลและนำขึ้นเซิร์ฟเวอร์
 
-## AI ในเครื่อง (0.4.0)
+## AI ในเครื่อง (0.5.0)
 
 ติดตั้ง Ollama และ `qwen3:8b` ตาม [LOCAL_AI.md](LOCAL_AI.md) StockLens ติดต่อเฉพาะ loopback และไม่เปิด Ollama ผ่านหน้าเว็บ ผลสรุปอยู่ในตาราง `ai_summaries` และเปลี่ยน cache key เมื่อโมเดล หุ้น หรือชุดหัวข้อข่าวเปลี่ยน การติดตั้งแบบ Docker ยังต้องออกแบบการเชื่อม container กับ Ollama เพิ่ม จึงแนะนำรัน Node โดยตรงสำหรับ Local AI รุ่นนี้
 
 ## ราคาแบบดึงเมื่อเปิดแอป (0.3.1)
 
-ตั้ง `FINNHUB_API_KEY` ใน `.env` แล้ว restart เซิร์ฟเวอร์ `GET /api/quotes` ต้อง Login และดึงเฉพาะหุ้นสหรัฐฯ ในพอร์ต ไม่รับ ticker จาก query ไม่ตั้ง scheduler สำหรับราคา ใช้ cache/attempt cooldown 60 วินาทีและรวมคำขอที่ซ้ำกัน เก็บตาราง `stock_quotes` ใน SQLite ไม่มี key ในฐานข้อมูลหรือคำตอบ API หากราคาไม่ครบ UI ไม่แสดงยอดรวมที่ทำให้เข้าใจว่าครบ ดู [คู่มือสมัครและตั้งค่า](FREE_SETUP.md)
+ตั้ง `FINNHUB_API_KEY` ใน `.env` แล้ว restart เซิร์ฟเวอร์ `GET /api/quotes` ต้อง Login และดึงเฉพาะบริษัทสหรัฐฯ ใน watchlist ไม่รับ ticker จาก query ไม่ตั้ง scheduler สำหรับราคา ใช้ cache/attempt cooldown 60 วินาทีและรวมคำขอที่ซ้ำกัน UI แสดงเฉพาะราคารายบริษัท ไม่คำนวณยอดพอร์ต ดู [คู่มือสมัครและตั้งค่า](FREE_SETUP.md)
 
 ## โครงสร้าง
 
@@ -49,7 +49,7 @@ npm.cmd run backup
 
 ได้ไฟล์ `backups/stocklens-<เวลา UTC>.sqlite` ใช้ SQLite online backup เพื่อให้ข้อมูลจาก WAL รวมอยู่ในไฟล์ สามารถสำรองขณะ server เปิดอยู่ ตั้ง `DATABASE_PATH` ให้ตรงกับ process แอปหากเปลี่ยนตำแหน่งฐานข้อมูล เก็บสำเนานอกเครื่องอย่างมีการควบคุมสิทธิ์
 
-ไฟล์ backup มีอีเมล password hashes พอร์ต และเซสชัน จึงเป็นข้อมูลส่วนตัว ไม่ส่งขึ้น GitHub การ backup สำเร็จยังต้องทดลอง restore เป็นระยะ
+ไฟล์ backup มีอีเมล password hashes รายการบริษัท/เว็บไซต์ที่สนใจ และเซสชัน จึงเป็นข้อมูลส่วนตัว ไม่ส่งขึ้น GitHub การ backup สำเร็จยังต้องทดลอง restore เป็นระยะ
 
 ## ทดลองกู้คืนโดยไม่เขียนทับฐานข้อมูลเดิม
 
@@ -62,7 +62,7 @@ $env:DATABASE_PATH = (Resolve-Path 'backups/restored.sqlite').Path
 npm.cmd start
 ```
 
-4. Login และตรวจพอร์ต/แหล่งข้อมูล หากสำเร็จจึงเลือก path นี้เป็นฐานข้อมูลใช้งานต่อ
+4. Login และตรวจรายการติดตาม/แหล่งข้อมูล หากสำเร็จจึงเลือก path นี้เป็นฐานข้อมูลใช้งานต่อ
 5. เซสชันที่ยังไม่หมดอายุใน backup อาจกลับมาใช้งานได้หลัง restore หากกู้คืนหลังเหตุข้อมูลรั่ว ผู้ดูแลต้องเพิกถอนเซสชันในฐานข้อมูลก่อนเปิดให้ผู้ใช้เข้า
 
 JSON จาก `/api/export` เป็นข้อมูลเฉพาะบัญชี ไม่ใช่ full database backup และยังไม่มี automatic import
@@ -115,7 +115,7 @@ npm.cmd run test:pwa
 npm.cmd run test:users
 ```
 
-API tests ตรวจ session, account isolation, revision conflict, input validation และ export; persistence tests ตรวจ restart, password hash, expired sessions และ backup; UI tests ตรวจ flow สมาชิก พอร์ต แหล่งข้อมูล มือถือ และกรณี stale/expired session
+API tests ตรวจ session, account isolation, revision conflict, input validation และ export; persistence tests ตรวจ restart, password hash, migration ที่ลบจำนวน/ต้นทุน, expired sessions และ backup; UI tests ตรวจ flow สมาชิก สิ่งที่ติดตาม แหล่งข้อมูล มือถือ และกรณี stale/expired session
 
 `test:users` เปิด browser contexts แยก 20 บัญชีพร้อมกัน (10 desktop, 10 mobile) และฐานข้อมูล SQLite ใหม่เฉพาะรอบ บันทึก `results.json` และภาพตัวอย่างใน `test-artifacts/users20-verified-<เวลา UTC>/` โฟลเดอร์นี้รวมฐานข้อมูลสังเคราะห์สำหรับตรวจสอบและถูก ignore จาก Git ไม่ใช้ `.data/stocklens.sqlite` ของบัญชีจริง รายงานสรุปที่เผยแพร่อยู่ใน [TEST_20_USERS.md](TEST_20_USERS.md)
 

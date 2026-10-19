@@ -20,7 +20,7 @@ test('quotes require configuration; coalesce requests, persist cooldown/cache an
   }finally{service.close();db.close();}
 });
 
-test('quote API authenticates, uses only owned holdings, and rechecks logout after upstream request',async t=>{
+test('quote API authenticates, uses only followed companies, and rechecks logout after upstream request',async t=>{
   let release,started;const ready=new Promise(r=>started=r),gate=new Promise(r=>release=r);let calls=0;
   const server=createApp({databasePath:':memory:',quoteApiKey:'fixture-secret',quoteFetcher:async url=>{calls++;assert.ok(url.endsWith('symbol=AAPL'));started();await gate;return Response.json({c:123,t:Math.floor(Date.now()/1000)});}});
   server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{release();return new Promise(r=>server.close(r));});const base=`http://127.0.0.1:${server.address().port}`;
@@ -29,7 +29,7 @@ test('quote API authenticates, uses only owned holdings, and rechecks logout aft
   }
   assert.equal((await call('/api/quotes')).status,401);assert.equal(calls,0);
   const account={name:'Quotes Test',email:'quotes@example.com',password:'quotes-test-password'};await call('/api/register',account);const login=await call('/api/login',account),cookie=login.headers.get('set-cookie').split(';')[0],user=await login.json();
-  user.state.holdings=[{symbol:'AAPL',qty:0.5,cost:100},{symbol:'PTT',qty:1,cost:30}];
+  user.state.watchlist=['AAPL'];
   assert.equal((await call('/api/state',{userId:user.user.id,revision:0,state:user.state},cookie,'PUT')).status,200);
   const pending=call('/api/quotes?symbols=MSFT',null,cookie);await ready;await call('/api/logout',{},cookie);release();assert.equal((await pending).status,401);assert.equal(calls,1);
   const next=await call('/api/login',account),newCookie=next.headers.get('set-cookie').split(';')[0];const result=await (await call('/api/quotes',null,newCookie)).json();assert.deepEqual(result.items.map(i=>i.symbol),['AAPL']);assert.equal(result.items[0].quote.price,123);assert.ok(!JSON.stringify(result).includes('fixture-secret'));

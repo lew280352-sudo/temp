@@ -19,10 +19,10 @@ try{
   const code=await page.locator('[aria-label="รหัสกู้คืน"]').inputValue();assert.equal(code.length,48);
   await page.locator('#login-form [name=password]').fill('pwa-original-password');await page.locator('#login-form [type=submit]').click();await page.waitForSelector('.news-card');
   assert.equal(await page.locator('.news-card').count(),3);assert.equal(await page.locator('.news-card img').count(),0);
-  await page.locator('[data-action=add]').first().click();await page.locator('[name=qty]').fill('0.125001');await page.locator('[name=cost]').fill('225.25');await page.locator('#holding-form [type=submit]').click();await page.waitForSelector('#modal:not([open])',{state:'attached'});
-  await page.waitForFunction(()=>document.querySelector('#quotes-panel')?.textContent.includes('$200.00'));assert.match(await page.locator('#quotes-panel').innerText(),/\$25\.00/);assert.match(await page.locator('#quotes-panel').innerText(),/−\$3\.16/);
+  await page.locator('[data-action=add]').first().click();await page.locator('#following-form [name=symbol]').selectOption('AAPL');await page.locator('#following-form [type=submit]').click();await page.waitForSelector('#modal:not([open])',{state:'attached'});
+  await page.waitForFunction(()=>document.querySelector('#quotes-panel')?.textContent.includes('$200.00'));assert.match(await page.locator('#quotes-panel').innerText(),/ไม่เก็บจำนวนหุ้นและต้นทุน/);
   await page.locator('[data-refresh-quotes]').click();await page.waitForFunction(()=>!quoteBusy);assert.equal((await page.evaluate(()=>fetch('/api/quotes').then(r=>r.json()))).items[0].quote.price,200);
-  await page.locator('[data-filter=portfolio]').click();assert.equal(await page.locator('.news-card').count(),1);assert.match(await page.locator('.news-card').innerText(),/AAPL/);
+  await page.locator('[data-filter=watchlist]').click();assert.equal(await page.locator('.news-card').count(),1);assert.match(await page.locator('.news-card').innerText(),/AAPL/);
   await page.locator('.topbar [data-page=sources]').click();const off=page.waitForResponse(r=>r.url().endsWith('/api/state')&&r.request().method()==='PUT');await page.locator('[data-source-toggle=apple]').uncheck();assert.equal((await off).status(),200);await page.waitForFunction(()=>!isSaving);
   const filtered=await page.evaluate(()=>fetch('/api/news').then(r=>r.json()));assert.equal(filtered.items.length,2);assert.ok(!filtered.items.some(n=>n.symbol==='AAPL'));
   await page.locator('[data-source-remove=microsoft]').click();await page.locator('[data-source-confirm=microsoft]').click();await page.waitForSelector('[data-add-feed=microsoft]');
@@ -32,14 +32,14 @@ try{
   await page.locator('.topbar [data-logout]').click();await page.waitForSelector('#login-form');
   await page.locator('[data-recover]').click();await page.locator('#recover-form [name=email]').fill('pwa@example.com');await page.locator('#recover-form [name=code]').fill(code);await page.locator('#recover-form [name=password]').fill('pwa-new-password');await page.locator('#recover-form [name=confirm]').fill('pwa-new-password');await page.locator('#recover-form [type=submit]').click();await page.waitForSelector('#login-form');assert.notEqual(await page.locator('[aria-label="รหัสกู้คืน"]').inputValue(),code);
   await page.locator('#login-form [name=password]').fill('pwa-new-password');await page.locator('#login-form [type=submit]').click();await page.waitForSelector('body:not(.signed-out)');
-  await page.locator('.sidebar [data-page=portfolio]').click();assert.match(await page.locator('tbody').first().innerText(),/0.125001/);
-  await page.evaluate(async()=>{const s=await fetch('/api/session').then(r=>r.json());s.state.holdings.push({symbol:'MSFT',qty:1,cost:100});const r=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:s.user.id,revision:s.revision,state:s.state})});if(!r.ok)throw new Error('prepare incomplete quote portfolio');});
-  await page.reload();await page.waitForFunction(()=>!quoteBusy&&quoteData.items.length===2);assert.match(await page.locator('#quotes-panel').innerText(),/ยังมีราคาไม่ครบ/);assert.match(await page.locator('#quotes-panel').innerText(),/ตรวจสอบได้/);
+  await page.locator('.sidebar [data-page=following]').click();assert.match(await page.locator('.company-grid').first().innerText(),/AAPL/);assert.doesNotMatch(await page.locator('#main').innerText(),/0\.125001|ต้นทุนเฉลี่ย/);
+  await page.evaluate(async()=>{const s=await fetch('/api/session').then(r=>r.json());s.state.watchlist.push('MSFT');const r=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:s.user.id,revision:s.revision,state:s.state})});if(!r.ok)throw new Error('prepare second followed company');});
+  await page.reload();await page.waitForFunction(()=>!quoteBusy&&quoteData.items.length===2);assert.match(await page.locator('#quotes-panel').innerText(),/ยังไม่มีราคา/);assert.match(await page.locator('#quotes-panel').innerText(),/ตรวจสอบได้/);
   const cached=await page.evaluate(async()=>{const keys=await caches.keys();return (await Promise.all(keys.map(async key=>(await (await caches.open(key)).keys()).map(req=>new URL(req.url).pathname)))).flat();});
   assert.deepEqual(cached.sort(),['/icon-192.png','/icon-512.png','/offline.html']);
-  await context.setOffline(true);await page.reload();assert.match(await page.locator('h1').innerText(),/ยังเชื่อมต่อ/);assert.doesNotMatch(await page.locator('body').innerText(),/pwa@example|0.125001/);
+  await context.setOffline(true);await page.reload();assert.match(await page.locator('h1').innerText(),/ยังเชื่อมต่อ/);assert.doesNotMatch(await page.locator('body').innerText(),/pwa@example|AAPL|MSFT/);
   await context.setOffline(false);await page.locator('a').click();await page.waitForSelector('body:not(.signed-out)');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
   await page.screenshot({path:'test-artifacts/pwa-mobile.png',fullPage:true});
-  console.log('PASS: manifest/icons, service worker, real feed adapter fixtures, XSS escaping, source/portfolio filtering, fractional shares, recovery and offline privacy.');
+  console.log('PASS: manifest/icons, service worker, real feed adapter fixtures, XSS escaping, source/watchlist filtering, privacy migration model, recovery and offline privacy.');
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

@@ -13,10 +13,9 @@ import { createAiService } from './ai.mjs';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const deriveKey = promisify(scrypt);
 const SESSION_AGE = 12 * 60 * 60 * 1000;
-// Preserve existing Thai holdings without interpreting their THB costs as USD.
-const symbols = new Set([...companies.map(c=>c.symbol),'PTT','ADVANC','CPALL','KBANK','AOT','SCB']);
+const symbols = new Set(companies.map(c=>c.symbol));
 export function initialState() {
-  return {holdings:[],alerts:{daily:true,news:true,trend:true,time:'08:00',scope:'portfolio'},sources:feeds.map(f=>({id:f.id,name:f.name,url:f.url,type:'company',symbol:f.symbol,enabled:true}))};
+  return {watchlist:[],alerts:{daily:true,news:true,trend:true,time:'08:00',scope:'watchlist'},sources:feeds.map(f=>({id:f.id,name:f.name,url:f.url,type:'company',symbol:f.symbol,enabled:true}))};
 }
 class HttpError extends Error { constructor(status,message){super(message);this.status=status;} }
 function fail(status,message){throw new HttpError(status,message);}
@@ -27,14 +26,14 @@ export function normalizeSourceUrl(value){
   url.hash='';return url.href;
 }
 function validateState(input){
-  if(!input||!Array.isArray(input.holdings)||input.holdings.length>symbols.size)fail(400,'ข้อมูลพอร์ตไม่ถูกต้อง');
-  const seen=new Set();
-  const holdings=input.holdings.map(h=>{
-    if(!h||!symbols.has(h.symbol)||seen.has(h.symbol)||!Number.isFinite(h.qty)||h.qty<0.000001||h.qty>1e9||Math.abs(h.qty*1e6-Math.round(h.qty*1e6))>0.001||!Number.isFinite(h.cost)||h.cost<0||h.cost>1e7)fail(400,'จำนวนหุ้นหรือต้นทุนไม่ถูกต้อง');
-    seen.add(h.symbol);return {symbol:h.symbol,qty:h.qty,cost:h.cost};
+  if(!input||!Array.isArray(input.watchlist)||input.watchlist.length>symbols.size)fail(400,'รายการบริษัทที่ติดตามไม่ถูกต้อง');
+  const seen=new Set(),watchlist=input.watchlist.map(value=>{
+    const symbol=typeof value==='string'?value.trim().toUpperCase():'';
+    if(!symbols.has(symbol)||seen.has(symbol))fail(400,'รายการบริษัทที่ติดตามไม่ถูกต้อง');
+    seen.add(symbol);return symbol;
   });
   const a=input.alerts;
-  if(!a||!['daily','news','trend'].every(k=>typeof a[k]==='boolean')||!/^([01]\d|2[0-3]):[0-5]\d$/.test(a.time)||!['portfolio','all'].includes(a.scope))fail(400,'การตั้งค่าแจ้งเตือนไม่ถูกต้อง');
+  if(!a||!['daily','news','trend'].every(k=>typeof a[k]==='boolean')||!/^([01]\d|2[0-3]):[0-5]\d$/.test(a.time)||!['watchlist','all'].includes(a.scope))fail(400,'การตั้งค่าแจ้งเตือนไม่ถูกต้อง');
   if(!Array.isArray(input.sources)||input.sources.length>50)fail(400,'บันทึกแหล่งข้อมูลได้สูงสุด 50 เว็บไซต์');
   const urls=new Set(),ids=new Set();
   const sources=input.sources.map(s=>{
@@ -42,7 +41,7 @@ function validateState(input){
     const url=normalizeSourceUrl(s.url);if(urls.has(url))fail(400,'มี URL นี้ในรายการแล้ว');urls.add(url);ids.add(s.id);
     return {id:s.id,name:s.name.trim(),url,type:s.type,symbol:s.symbol,enabled:s.enabled};
   });
-  return {holdings,alerts:{daily:a.daily,news:a.news,trend:a.trend,time:a.time,scope:a.scope},sources};
+  return {watchlist,alerts:{daily:a.daily,news:a.news,trend:a.trend,time:a.time,scope:a.scope},sources};
 }
 async function body(req){
   if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']||''))fail(415,'ต้องส่งข้อมูล JSON');
@@ -69,6 +68,15 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
     CREATE INDEX IF NOT EXISTS session_expiry ON sessions(expires_at);`);
   if(!db.prepare('PRAGMA table_info(user_state)').all().some(column=>column.name==='revision'))db.exec('ALTER TABLE user_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 0');
   db.exec('CREATE TABLE IF NOT EXISTS recovery_codes(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,code_hash TEXT NOT NULL)');
+  // Privacy migration: retain only followed company symbols from the former portfolio.
+  for(const row of db.prepare('SELECT user_id,data FROM user_state').all()){
+    let data;try{data=JSON.parse(row.data);}catch{continue;}
+    if(Array.isArray(data.watchlist))continue;
+    const watchlist=[...new Set((Array.isArray(data.holdings)?data.holdings:[]).map(item=>item?.symbol).filter(symbol=>symbols.has(symbol)))];
+    const alerts={...initialState().alerts,...data.alerts,scope:data.alerts?.scope==='all'?'all':'watchlist'};
+    const migrated={watchlist,alerts,sources:Array.isArray(data.sources)?data.sources:initialState().sources};
+    db.prepare('UPDATE user_state SET data=?,revision=revision+1 WHERE user_id=?').run(JSON.stringify(migrated),row.user_id);
+  }
   const news=createNewsService(db,{fetcher:newsFetcher});
   const quotes=createQuoteService(db,{apiKey:quoteApiKey,fetcher:quoteFetcher});
   const ai=createAiService(db,{enabled:aiEnabled,baseUrl:aiBaseUrl,model:aiModel,fetcher:aiFetcher});
@@ -100,7 +108,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       const origin=publicOrigin||`http://${req.headers.host}`;
       if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origin)fail(403,'คำขอไม่ได้มาจากเว็บไซต์นี้');
       const pathname=new URL(req.url,origin).pathname;
-      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.4.0'});}
+      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.5.0'});}
       if(pathname==='/api/ai/status'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
         const result=await ai.status();
@@ -109,10 +117,10 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       }
       if(pathname==='/api/quotes'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
-        const holdings=userData(user).state.holdings;
-        const result=await quotes.get(holdings.map(h=>h.symbol));
+        const watchlist=userData(user).state.watchlist;
+        const result=await quotes.get(watchlist);
         if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
-        const currentSymbols=new Set(userData(user).state.holdings.map(h=>h.symbol));
+        const currentSymbols=new Set(userData(user).state.watchlist);
         return send(res,200,{...result,items:result.items.filter(item=>currentSymbols.has(item.symbol))});
       }
       if(pathname==='/api/news'&&req.method==='GET'){

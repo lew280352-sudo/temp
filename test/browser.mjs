@@ -17,7 +17,7 @@ try{
   await page.locator('[name=confirm]').fill('strong-test-password');await page.locator('#register-form [type=submit]').click();await page.waitForSelector('#login-form');
   await page.locator('[name=password]').fill('wrong-password');await page.locator('#login-form [type=submit]').click();await page.waitForFunction(()=>document.querySelector('#auth-error').textContent.includes('ไม่ถูกต้อง'));
   await page.locator('[name=password]').fill('strong-test-password');await page.locator('#login-form [type=submit]').click();await page.waitForSelector('body:not(.signed-out)');
-  await page.locator('[data-action=add]').first().click();await page.locator('[name=qty]').fill('100');await page.locator('[name=cost]').fill('30');await page.locator('#holding-form [type=submit]').click();await page.waitForSelector('#modal:not([open])',{state:'attached'});
+  await page.locator('[data-action=add]').first().click();await page.locator('#following-form [name=symbol]').selectOption('AAPL');await page.locator('#following-form [type=submit]').click();await page.waitForSelector('#modal:not([open])',{state:'attached'});
   await page.screenshot({path:'test-artifacts/dashboard-desktop.png',fullPage:true});
   await page.locator('.sidebar [data-page=sources]').click();await page.waitForSelector('#source-form');
   assert.equal(await page.locator('.source-entry').count(),3);
@@ -27,17 +27,17 @@ try{
   await page.screenshot({path:'test-artifacts/sources-desktop.png',fullPage:true});
   await page.locator('.source-entry').last().locator('.remove').click();await page.locator('[data-source-confirm]').click();await page.waitForFunction(()=>document.querySelectorAll('.source-entry').length===3);
   await page.locator('.sidebar [data-page=search]').click();await page.locator('#company-query').fill('แอปเปิล');assert.equal(await page.locator('.company-card').count(),1);
-  await page.locator('.sidebar [data-page=portfolio]').click();assert.match(await page.locator('tbody').first().innerText(),/100/);
+  await page.locator('.sidebar [data-page=following]').click();assert.match(await page.locator('.company-grid').first().innerText(),/AAPL/);assert.equal(await page.locator('input[name=qty], input[name=cost]').count(),0);assert.doesNotMatch(await page.locator('#main').innerText(),/0\.125001|ต้นทุนเฉลี่ย/);
   await page.locator('.sidebar [data-page=insights]').click();await page.locator('#ai-symbol').selectOption('NVDA');assert.match(await page.locator('.ai-trend').innerText(),/ยังเริ่ม AI ไม่ได้/);
   // A stale view must reload rather than silently overwrite a newer save.
   const snapshot=await page.evaluate(()=>fetch('/api/session').then(r=>r.json()));
-  await page.evaluate(async snapshot=>{const next=structuredClone(snapshot.state);next.holdings[0].qty=222;const r=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:snapshot.user.id,revision:snapshot.revision,state:next})});if(!r.ok)throw new Error('failed to prepare concurrent save');},snapshot);
-  await page.locator('.sidebar [data-page=portfolio]').click();await page.locator('[data-edit=AAPL]').click();await page.locator('[name=qty]').fill('333');await page.locator('#holding-form [type=submit]').click();
-  await page.waitForFunction(()=>document.querySelector('tbody').textContent.includes('222'));
-  assert.equal((await page.evaluate(()=>fetch('/api/session').then(r=>r.json()))).state.holdings[0].qty,222);
+  await page.evaluate(async snapshot=>{const next=structuredClone(snapshot.state);next.watchlist.push('MSFT');const r=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:snapshot.user.id,revision:snapshot.revision,state:next})});if(!r.ok)throw new Error('failed to prepare concurrent save');},snapshot);
+  await page.locator('.sidebar [data-page=alerts]').click();await page.locator('#alert-form [name=time]').fill('09:00');await page.locator('#alert-form [type=submit]').click();
+  await page.waitForFunction(()=>state.watchlist.includes('MSFT'));
+  assert.deepEqual((await page.evaluate(()=>fetch('/api/session').then(r=>r.json()))).state.watchlist,['AAPL','MSFT']);
   // Expired/logout session must clear private content on the next attempted save.
   await page.evaluate(()=>fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}));
-  await page.locator('[data-edit=AAPL]').click();await page.locator('[name=qty]').fill('444');await page.locator('#holding-form [type=submit]').click();await page.waitForSelector('#login-form');
+  await page.locator('.sidebar [data-page=sources]').click();await page.locator('#source-form [name=name]').fill('Expired session source');await page.locator('#source-form [name=url]').fill('https://example.com/expired');await page.locator('#source-form [type=submit]').click();await page.waitForSelector('#login-form');
   assert.equal(await page.locator('#main').innerHTML(),'');
   await page.locator('[name=email]').fill('ui@example.com');await page.locator('[name=password]').fill('strong-test-password');await page.locator('#login-form [type=submit]').click();await page.waitForSelector('body:not(.signed-out)');
   await page.locator('.sidebar [data-logout]').click();await page.waitForSelector('#login-form');
@@ -48,5 +48,5 @@ try{
   await page.screenshot({path:'test-artifacts/dashboard-mobile.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.locator('.topbar [data-page=sources]').click();await page.waitForSelector('#source-form');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.locator('.topbar [data-logout]').click();await page.waitForSelector('#login-form');
-  assert.deepEqual(errors,[]);console.log('PASS: desktop/mobile registration, password mismatch, wrong-password rejection, login, portfolio, URL add/duplicate/delete/persistence, Thai search, AI, logout and overflow checks.');
+  assert.deepEqual(errors,[]);console.log('PASS: desktop/mobile registration, password mismatch, wrong-password rejection, login, news preferences, URL add/duplicate/delete/persistence, Thai search, AI, logout and overflow checks.');
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

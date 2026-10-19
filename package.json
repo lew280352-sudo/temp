@@ -1,6 +1,6 @@
 {
   "name": "stocklens",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -12,7 +12,8 @@
     "test:ui": "node test/browser.mjs",
     "test:users": "node test/virtual-users.mjs",
     "test:pwa": "node test/pwa.mjs",
-    "backup": "node --env-file-if-exists=.env scripts/backup.mjs"
+    "backup": "node --env-file-if-exists=.env scripts/backup.mjs",
+    "audit:privacy": "node --env-file-if-exists=.env scripts/audit-privacy.mjs"
   },
   "devDependencies": {
     "playwright": "^1.58.2"
