@@ -1,8 +1,8 @@
 # คู่มือผู้ดูแลและนำขึ้นเซิร์ฟเวอร์
 
-## AI ในเครื่อง (0.5.0)
+## AI ออนไลน์หรือในเครื่อง (0.6.0)
 
-ติดตั้ง Ollama และ `qwen3:8b` ตาม [LOCAL_AI.md](LOCAL_AI.md) StockLens ติดต่อเฉพาะ loopback และไม่เปิด Ollama ผ่านหน้าเว็บ ผลสรุปอยู่ในตาราง `ai_summaries` และเปลี่ยน cache key เมื่อโมเดล หุ้น หรือชุดหัวข้อข่าวเปลี่ยน การติดตั้งแบบ Docker ยังต้องออกแบบการเชื่อม container กับ Ollama เพิ่ม จึงแนะนำรัน Node โดยตรงสำหรับ Local AI รุ่นนี้
+โหมด `AI_PROVIDER=auto` เลือก Groq เมื่อมี `GROQ_API_KEY` มิฉะนั้นใช้ Ollama ผลสรุปอยู่ในตาราง `ai_summaries` และ cache key แยกตาม provider, model, ticker และชุดหัวข้อข่าว API key อยู่เฉพาะ environment ฝั่งเซิร์ฟเวอร์และไม่อยู่ใน response/log/database
 
 ## ราคาแบบดึงเมื่อเปิดแอป (0.3.1)
 
@@ -12,7 +12,7 @@
 
 ```text
 server.mjs          HTTP API, authentication, SQLite และ static assets
-ai.mjs              ตัวเชื่อม Ollama, structured output และ summary cache
+ai.mjs              ตัวเชื่อม Groq/Ollama, structured output และ summary cache
 dist/               หน้าเว็บและสคริปต์ฝั่งเบราว์เซอร์
 test/               API, persistence และ browser tests
 scripts/backup.mjs  สำรอง SQLite ด้วย online backup API
@@ -32,8 +32,12 @@ backups/            สำเนาฐานข้อมูล (ไม่ขึ�
 | `APP_ORIGIN` | origin localhost ตาม request | origin ของเว็บ เช่น `https://your-domain.example` ไม่มี path/query/credentials |
 | `DATABASE_PATH` | `.data/stocklens.sqlite` ใต้โฟลเดอร์แอป | path ฐานข้อมูล persistent |
 | `NEWS_ENABLED` | `true` | ตั้ง `false` เพื่อปิดการดึง RSS; cache เดิมยังอ่านได้พร้อมสถานะอายุ |
-| `AI_ENABLED` | `true` | ตั้ง `false` เพื่อปิด Local AI |
+| `AI_ENABLED` | `true` | ตั้ง `false` เพื่อปิด AI |
+| `AI_PROVIDER` | `auto` | `auto`, `groq` หรือ `ollama`; auto เลือก Groq เมื่อมี key |
+| `GROQ_API_KEY` | ว่าง | secret สำหรับ GroqCloud เก็บเฉพาะ server environment |
+| `GROQ_MODEL` | `qwen/qwen3.8-27b` | โมเดลออนไลน์ที่ใช้ structured output |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | endpoint Ollama; อนุญาตเฉพาะ localhost |
+| `OLLAMA_MODEL` | `qwen3:8b` | โมเดลสำรองในเครื่อง |
 | `OLLAMA_MODEL` | `qwen3:8b` | โมเดลที่ต้องมีใน `ollama list` |
 | `BROWSER_PATH` | Edge บน Windows / Playwright Chromium บนระบบอื่น | ใช้เฉพาะ browser tests |
 
@@ -92,7 +96,7 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 | `POST /api/recover` | `{email,code,password}` ใช้รหัสกู้คืน เปลี่ยนรหัสผ่าน ออกทุกเซสชัน คืน recoveryCode ใหม่ |
 | `POST /api/recovery-code` | Login + `{password}` สร้างรหัสกู้คืนใหม่ ยกเลิกรหัสเดิม |
 | `GET /api/news` | Login; ข่าวจากฟีดที่เปิดในบัญชี พร้อม source status/timestamps |
-| `GET /api/ai/status` | Login; ตรวจว่า Ollama และโมเดลที่ตั้งค่าไว้พร้อม |
+| `GET /api/ai/status` | Login; คืน provider/model/สถานะพร้อม โดยไม่คืน API key |
 | `POST /api/ai/summary` | Login + `{symbol}`; สรุปหัวข้อข่าวที่เปิดในบัญชีด้วย structured output |
 | `GET /api/health` | ตรวจ process/SQLite เท่านั้น ไม่ยืนยันว่า provider ภายนอกพร้อม |
 | `POST /api/login` | `{email,password}` รับ `{user,state,revision}` และ HttpOnly session cookie |
