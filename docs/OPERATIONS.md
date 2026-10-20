@@ -2,7 +2,7 @@
 
 ## AI ออนไลน์หรือในเครื่อง (0.6.0)
 
-โหมด `AI_PROVIDER=auto` เลือก Groq เมื่อมี `GROQ_API_KEY` มิฉะนั้นใช้ Ollama ผลสรุปอยู่ในตาราง `ai_summaries` และ cache key แยกตาม provider, model, ticker และชุดหัวข้อข่าว API key อยู่เฉพาะ environment ฝั่งเซิร์ฟเวอร์และไม่อยู่ใน response/log/database
+โหมด `AI_PROVIDER=auto` ใช้ Groq ก่อนเมื่อมี `GROQ_API_KEY` และ fail over ไป Ollama เมื่อคำขอออนไลน์ล้มเหลว มิฉะนั้นใช้ Ollama โดยตรง ผลสรุปอยู่ในตาราง `ai_summaries` และ cache key แยกตาม provider, model, ticker และชุดหัวข้อข่าว API key อยู่เฉพาะ environment ฝั่งเซิร์ฟเวอร์และไม่อยู่ใน response/log/database
 
 ## ราคาแบบดึงเมื่อเปิดแอป (0.3.1)
 
@@ -33,7 +33,7 @@ backups/            สำเนาฐานข้อมูล (ไม่ขึ�
 | `DATABASE_PATH` | `.data/stocklens.sqlite` ใต้โฟลเดอร์แอป | path ฐานข้อมูล persistent |
 | `NEWS_ENABLED` | `true` | ตั้ง `false` เพื่อปิดการดึง RSS; cache เดิมยังอ่านได้พร้อมสถานะอายุ |
 | `AI_ENABLED` | `true` | ตั้ง `false` เพื่อปิด AI |
-| `AI_PROVIDER` | `auto` | `auto`, `groq` หรือ `ollama`; auto เลือก Groq เมื่อมี key |
+| `AI_PROVIDER` | `auto` | `auto`, `groq` หรือ `ollama`; auto ใช้ Groq ก่อนแล้ว fallback ไป Ollama |
 | `GROQ_API_KEY` | ว่าง | secret สำหรับ GroqCloud เก็บเฉพาะ server environment |
 | `GROQ_MODEL` | `qwen/qwen3.8-27b` | โมเดลออนไลน์ที่ใช้ structured output |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | endpoint Ollama; อนุญาตเฉพาะ localhost |

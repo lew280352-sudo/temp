@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { createAiService } from '../ai.mjs';
+import { createAiRouter, createAiService } from '../ai.mjs';
 
 test('local AI checks the selected model, uses structured output, and caches identical news',async()=>{
   const db=new DatabaseSync(':memory:');let chats=0,request;
@@ -48,4 +48,13 @@ test('Groq online AI keeps the key in server headers and requests strict structu
   assert.equal((await missing.status()).configured,false);
   await assert.rejects(()=>missing.summarize('MSFT',[item]),error=>error.code==='not_configured');
   missing.close();missingDb.close();ai.close();db.close();
+});
+
+test('auto AI falls back from an unavailable online provider to local AI',async()=>{
+  let primaryCalls=0,localCalls=0;
+  const primary={status:async()=>({provider:'groq',available:true,online:true}),summarize:async()=>{primaryCalls++;throw new Error('rate limited');},close(){}};
+  const fallback={status:async()=>({provider:'ollama',available:true,online:false,model:'qwen3:8b'}),summarize:async()=>{localCalls++;return {provider:'ollama',model:'qwen3:8b',summary:'local result'};},close(){}};
+  const ai=createAiRouter(primary,fallback),status=await ai.status(),result=await ai.summarize('AAPL',[]);
+  assert.equal(status.provider,'groq');assert.equal(status.fallbackAvailable,true);
+  assert.equal(primaryCalls,1);assert.equal(localCalls,1);assert.equal(result.provider,'ollama');assert.equal(result.fallbackFrom,'groq');
 });

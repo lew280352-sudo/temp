@@ -79,3 +79,22 @@ export function createAiService(db,{enabled=true,provider='ollama',baseUrl='http
   }
   return {status,summarize,close(){pending.clear();}};
 }
+
+export function createAiRouter(primary,fallback){
+  return {
+    async status(){
+      const [first,second]=await Promise.all([primary.status(),fallback.status()]);
+      const active=first.available?first:second.available?{...second,fallbackFrom:first.provider}:first;
+      return {...active,fallbackProvider:second.provider,fallbackAvailable:second.available};
+    },
+    async summarize(symbol,items){
+      try{return await primary.summarize(symbol,items);}
+      catch(error){
+        if(['disabled','no_news'].includes(error.code))throw error;
+        try{return {...await fallback.summarize(symbol,items),fallbackFrom:'groq'};}
+        catch{const unavailable=new Error('Online and local AI are unavailable');unavailable.code='providers_unavailable';throw unavailable;}
+      }
+    },
+    close(){primary.close();fallback.close();}
+  };
+}

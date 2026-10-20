@@ -2,7 +2,7 @@
 
 - รองรับ GroqCloud Free Plan ผ่าน endpoint คงที่ `https://api.groq.com`
 - ค่าเริ่มต้นออนไลน์ใช้ `qwen/qwen3.8-27b` และ strict JSON Schema
-- `AI_PROVIDER=auto` ใช้ Groq เมื่อมี `GROQ_API_KEY`; หากไม่มีใช้ Ollama/Qwen3 8B ในเครื่อง
+- `AI_PROVIDER=auto` ใช้ Groq เมื่อมี `GROQ_API_KEY`; หาก Groq ล้มเหลวหรือโควตาหมดจะ fallback ไป Ollama/Qwen3 8B อัตโนมัติ
 - API key อยู่เฉพาะ server environment ไม่ส่งไป browser, prompt, cache หรือ export
 - หน้า AI บอกชัดว่ากำลังใช้ Groq ออนไลน์หรือ Ollama ในเครื่อง
 - เมื่อใช้ Groq ส่งเฉพาะข้อมูลหัวข้อข่าวที่จำเป็น ไม่ส่งข้อมูลบัญชี

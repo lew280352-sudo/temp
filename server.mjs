@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { companies } from './dist/catalog.js';
 import { feeds, createNewsService } from './feeds.mjs';
 import { createQuoteService } from './quotes.mjs';
-import { createAiService } from './ai.mjs';
+import { createAiRouter, createAiService } from './ai.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const deriveKey = promisify(scrypt);
@@ -53,7 +53,7 @@ async function passwordHash(password,salt){return deriveKey(password,salt,64,{N:
 const tokenHash=token=>createHash('sha256').update(token).digest('hex');
 function tokenFrom(req){return (req.headers.cookie||'').split(';').map(c=>c.trim()).find(c=>c.startsWith('stocklens_session='))?.slice(18)||'';}
 
-export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch,quoteApiKey='',quoteFetcher=fetch,aiEnabled=false,aiProvider='ollama',aiBaseUrl='http://127.0.0.1:11434',aiApiKey='',aiModel,aiFetcher=fetch}={}){
+export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch,quoteApiKey='',quoteFetcher=fetch,aiEnabled=false,aiProvider='ollama',aiBaseUrl='http://127.0.0.1:11434',aiApiKey='',aiModel,aiFallbackModel='qwen3:8b',aiFetcher=fetch}={}){
   if(publicOrigin){
     let url;try{url=new URL(publicOrigin);}catch{throw new Error('APP_ORIGIN must be an http(s) origin');}
     if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('APP_ORIGIN must contain only scheme, hostname and optional port');
@@ -79,7 +79,10 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
   }
   const news=createNewsService(db,{fetcher:newsFetcher});
   const quotes=createQuoteService(db,{apiKey:quoteApiKey,fetcher:quoteFetcher});
-  const ai=createAiService(db,{enabled:aiEnabled,provider:aiProvider,baseUrl:aiBaseUrl,apiKey:aiApiKey,model:aiModel,fetcher:aiFetcher});
+  const ai=aiProvider==='hybrid'?createAiRouter(
+    createAiService(db,{enabled:aiEnabled,provider:'groq',apiKey:aiApiKey,model:aiModel,fetcher:aiFetcher}),
+    createAiService(db,{enabled:aiEnabled,provider:'ollama',baseUrl:aiBaseUrl,model:aiFallbackModel,fetcher:aiFetcher})
+  ):createAiService(db,{enabled:aiEnabled,provider:aiProvider,baseUrl:aiBaseUrl,apiKey:aiApiKey,model:aiModel,fetcher:aiFetcher});
   let newsTimer;
   const newRecoveryCode=()=>randomBytes(24).toString('hex');
   const attempts=new Map();
@@ -108,7 +111,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       const origin=publicOrigin||`http://${req.headers.host}`;
       if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origin)fail(403,'คำขอไม่ได้มาจากเว็บไซต์นี้');
       const pathname=new URL(req.url,origin).pathname;
-      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.6.0'});}
+      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.6.1'});}
       if(pathname==='/api/ai/status'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
         const result=await ai.status();
@@ -140,6 +143,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
           if(error.code==='disabled')fail(503,'AI ยังไม่เปิดใช้');
           if(error.code==='not_configured')fail(503,'ยังไม่ได้ตั้งค่า Groq API key');
           if(error.code==='no_news')fail(422,'ยังไม่มีหัวข้อข่าวสำหรับหุ้นนี้ เลือก AAPL, MSFT หรือ NVDA และเปิดฟีดข่าวของบริษัท');
+          if(error.code==='providers_unavailable')fail(503,'Groq และ Ollama ยังไม่พร้อม ตรวจโควตา อินเทอร์เน็ต และ Ollama');
           fail(503,aiProvider==='groq'?'ติดต่อ Groq AI ไม่สำเร็จ ตรวจ API key โควตา และอินเทอร์เน็ต':'ติดต่อ AI ในเครื่องไม่สำเร็จ ตรวจว่าเปิด Ollama และติดตั้งโมเดลแล้ว');
         }
         if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
@@ -235,8 +239,8 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   const port=Number(process.env.PORT||4173),host=process.env.HOST||'127.0.0.1';
   if(!Number.isInteger(port)||port<1||port>65535)throw new Error('PORT must be an integer from 1 to 65535');
   if(!['127.0.0.1','localhost','::1'].includes(host)&&!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN before listening beyond localhost');
-  const groqApiKey=process.env.GROQ_API_KEY?.trim()||'',configuredProvider=(process.env.AI_PROVIDER||'auto').trim().toLowerCase(),aiProvider=configuredProvider==='auto'?(groqApiKey?'groq':'ollama'):configuredProvider;
-  const server=createApp({databasePath:process.env.DATABASE_PATH?path.resolve(process.env.DATABASE_PATH):undefined,publicOrigin:process.env.APP_ORIGIN||null,refreshNews:process.env.NEWS_ENABLED!=='false',quoteApiKey:process.env.FINNHUB_API_KEY?.trim()||'',aiEnabled:process.env.AI_ENABLED!=='false',aiProvider,aiBaseUrl:process.env.OLLAMA_URL||'http://127.0.0.1:11434',aiApiKey:groqApiKey,aiModel:aiProvider==='groq'?(process.env.GROQ_MODEL||'qwen/qwen3.8-27b'):(process.env.OLLAMA_MODEL||'qwen3:8b')});
+  const groqApiKey=process.env.GROQ_API_KEY?.trim()||'',configuredProvider=(process.env.AI_PROVIDER||'auto').trim().toLowerCase(),aiProvider=configuredProvider==='auto'?(groqApiKey?'hybrid':'ollama'):configuredProvider;
+  const server=createApp({databasePath:process.env.DATABASE_PATH?path.resolve(process.env.DATABASE_PATH):undefined,publicOrigin:process.env.APP_ORIGIN||null,refreshNews:process.env.NEWS_ENABLED!=='false',quoteApiKey:process.env.FINNHUB_API_KEY?.trim()||'',aiEnabled:process.env.AI_ENABLED!=='false',aiProvider,aiBaseUrl:process.env.OLLAMA_URL||'http://127.0.0.1:11434',aiApiKey:groqApiKey,aiModel:['groq','hybrid'].includes(aiProvider)?(process.env.GROQ_MODEL||'qwen/qwen3.8-27b'):(process.env.OLLAMA_MODEL||'qwen3:8b'),aiFallbackModel:process.env.OLLAMA_MODEL||'qwen3:8b'});
   server.listen(port,host,()=>console.log(`StockLens: http://${host}:${server.address().port}`));
   server.on('error',error=>{console.error(error.code==='EADDRINUSE'?`พอร์ต ${port} ถูกใช้อยู่แล้ว ตั้งค่า PORT เป็นหมายเลขอื่น`:error.message);process.exitCode=1;});
   for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{server.close();server.closeIdleConnections();});
