@@ -31,13 +31,14 @@ backups/            สำเนาฐานข้อมูล (ไม่ขึ�
 | `PORT` | `4173` | พอร์ต 1–65535 |
 | `APP_ORIGIN` | origin localhost ตาม request | origin ของเว็บ เช่น `https://your-domain.example` ไม่มี path/query/credentials |
 | `DATABASE_PATH` | `.data/stocklens.sqlite` ใต้โฟลเดอร์แอป | path ฐานข้อมูล persistent |
-| `NEWS_ENABLED` | `true` | ตั้ง `false` เพื่อปิดการดึง RSS; cache เดิมยังอ่านได้พร้อมสถานะอายุ |
+| `NEWS_ENABLED` | `true` | ตั้ง `false` เพื่อปิดการดึง RSS และข่าวผ่าน Finnhub; cache เดิมยังอ่านได้พร้อมสถานะอายุ |
+| `FINNHUB_API_KEY` | ว่าง | ราคาล่าสุดและข่าวสื่อการเงินของ 12 บริษัท เก็บเฉพาะ server environment |
+| `ALPHAVANTAGE_API_KEY` | ว่าง | ราคาปิดย้อนหลังแบบฟรีและ backtest ของโหมดแนวโน้ม เก็บเฉพาะ server environment |
 | `AI_ENABLED` | `true` | ตั้ง `false` เพื่อปิด AI |
 | `AI_PROVIDER` | `auto` | `auto`, `groq` หรือ `ollama`; auto ใช้ Groq ก่อนแล้ว fallback ไป Ollama |
 | `GROQ_API_KEY` | ว่าง | secret สำหรับ GroqCloud เก็บเฉพาะ server environment |
 | `GROQ_MODEL` | `qwen/qwen3.8-27b` | โมเดลออนไลน์ที่ใช้ structured output |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | endpoint Ollama; อนุญาตเฉพาะ localhost |
-| `OLLAMA_MODEL` | `qwen3:8b` | โมเดลสำรองในเครื่อง |
 | `OLLAMA_MODEL` | `qwen3:8b` | โมเดลที่ต้องมีใน `ollama list` |
 | `BROWSER_PATH` | Edge บน Windows / Playwright Chromium บนระบบอื่น | ใช้เฉพาะ browser tests |
 
@@ -96,6 +97,7 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 | `POST /api/recover` | `{email,code,password}` ใช้รหัสกู้คืน เปลี่ยนรหัสผ่าน ออกทุกเซสชัน คืน recoveryCode ใหม่ |
 | `POST /api/recovery-code` | Login + `{password}` สร้างรหัสกู้คืนใหม่ ยกเลิกรหัสเดิม |
 | `GET /api/news` | Login; ข่าวจากฟีดที่เปิดในบัญชี พร้อม source status/timestamps |
+| `GET /api/forecast?symbol=AAPL` | Login; สถานะราคาย้อนหลัง ผล backtest และสัญญาณทดลองเมื่อผ่านเกณฑ์; ไม่คืน API key |
 | `GET /api/ai/status` | Login; คืน provider/model/สถานะพร้อม โดยไม่คืน API key |
 | `POST /api/ai/summary` | Login + `{symbol}`; สรุปหัวข้อข่าวที่เปิดในบัญชีด้วย structured output |
 | `GET /api/health` | ตรวจ process/SQLite เท่านั้น ไม่ยืนยันว่า provider ภายนอกพร้อม |

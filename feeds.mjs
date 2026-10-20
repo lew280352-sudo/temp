@@ -1,5 +1,6 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { createHash } from 'node:crypto';
+import {marketFeeds,fetchMarketNews} from './market-news.mjs';
 
 export const feeds = [
   {id:'apple',name:'Apple Newsroom',symbol:'AAPL',url:'https://www.apple.com/newsroom/',feedUrl:'https://www.apple.com/newsroom/rss-feed.rss'},
@@ -39,25 +40,28 @@ export async function fetchFeed(feed,fetcher=fetch){
   try{while(true){const {value,done}=await reader.read();if(done)break;size+=value.length;if(size>LIMIT)throw new Error('Feed too large');chunks.push(value);}}catch(error){await reader.cancel();throw error;}finally{reader.releaseLock();}
   return parseFeed(Buffer.concat(chunks).toString('utf8'),feed);
 }
-export function createNewsService(db,{fetcher=fetch}={}){
+export function createNewsService(db,{fetcher=fetch,marketApiKey='',marketFetcher=fetch,now=Date.now}={}){
   db.exec('CREATE TABLE IF NOT EXISTS news_feeds(id TEXT PRIMARY KEY, data TEXT NOT NULL, checked_at TEXT, succeeded_at TEXT, error TEXT)');
+  const activeFeeds=marketApiKey?[...feeds,...marketFeeds]:feeds;
   let running=null,closed=false;
   async function refresh(){
     if(closed)return;
     if(running)return running;
-    running=Promise.all(feeds.map(async feed=>{
-      const checked=new Date().toISOString();
+    running=Promise.all(activeFeeds.map(async feed=>{
+      const previous=db.prepare('SELECT checked_at FROM news_feeds WHERE id=?').get(feed.id);
+      if(feed.type==='finance'&&previous?.checked_at&&now()-Date.parse(previous.checked_at)<4*60*60*1000)return;
+      const checked=new Date(now()).toISOString();
       try{
-        const items=await fetchFeed(feed,fetcher);if(closed)return;
+        const items=feed.type==='finance'?await fetchMarketNews(feed,marketApiKey,marketFetcher,now()):await fetchFeed(feed,fetcher);if(closed)return;
         db.prepare('INSERT INTO news_feeds VALUES(?,?,?,?,NULL) ON CONFLICT(id) DO UPDATE SET data=excluded.data,checked_at=excluded.checked_at,succeeded_at=excluded.succeeded_at,error=NULL').run(feed.id,JSON.stringify(items),checked,checked);
       }catch(error){if(closed)return;db.prepare("INSERT INTO news_feeds VALUES(?,'[]',?,NULL,?) ON CONFLICT(id) DO UPDATE SET checked_at=excluded.checked_at,error=excluded.error").run(feed.id,checked,/^HTTP \d{3}$/.test(error.message)?error.message:'ดึงข้อมูลไม่สำเร็จ');}
     })).finally(()=>{running=null;});
     return running;
   }
   function snapshot(){
-    const items=[],statuses=feeds.map(feed=>{
+    const items=[],statuses=activeFeeds.map(feed=>{
       const row=db.prepare('SELECT * FROM news_feeds WHERE id=?').get(feed.id);
-      const stale=!row?.succeeded_at||Date.now()-Date.parse(row.succeeded_at)>60*60*1000;
+      const stale=!row?.succeeded_at||now()-Date.parse(row.succeeded_at)>(feed.type==='finance'?6:1)*60*60*1000;
       if(row)items.push(...JSON.parse(row.data).map(item=>({...item,stale:stale||!!row.error})));
       return {...feed,checkedAt:row?.checked_at??null,succeededAt:row?.succeeded_at??null,status:row?.error?'error':stale?'pending':'ok',error:row?.error??null};
     });

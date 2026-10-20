@@ -7,15 +7,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { companies } from './dist/catalog.js';
 import { feeds, createNewsService } from './feeds.mjs';
+import {marketFeeds} from './market-news.mjs';
 import { createQuoteService } from './quotes.mjs';
+import {createForecastService} from './forecast.mjs';
 import { createAiRouter, createAiService } from './ai.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const deriveKey = promisify(scrypt);
 const SESSION_AGE = 12 * 60 * 60 * 1000;
 const symbols = new Set(companies.map(c=>c.symbol));
-export function initialState() {
-  return {watchlist:[],alerts:{daily:true,news:true,trend:true,time:'08:00',scope:'watchlist'},sources:feeds.map(f=>({id:f.id,name:f.name,url:f.url,type:'company',symbol:f.symbol,enabled:true}))};
+export function initialState(includeMarket=false) {
+  return {watchlist:[],alerts:{daily:true,news:true,trend:true,time:'08:00',scope:'watchlist'},sources:[...feeds,...(includeMarket?marketFeeds:[])].map(f=>({id:f.id,name:f.name,url:f.url,type:f.type||'company',symbol:f.symbol,enabled:true}))};
 }
 class HttpError extends Error { constructor(status,message){super(message);this.status=status;} }
 function fail(status,message){throw new HttpError(status,message);}
@@ -53,7 +55,7 @@ async function passwordHash(password,salt){return deriveKey(password,salt,64,{N:
 const tokenHash=token=>createHash('sha256').update(token).digest('hex');
 function tokenFrom(req){return (req.headers.cookie||'').split(';').map(c=>c.trim()).find(c=>c.startsWith('stocklens_session='))?.slice(18)||'';}
 
-export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch,quoteApiKey='',quoteFetcher=fetch,aiEnabled=false,aiProvider='ollama',aiBaseUrl='http://127.0.0.1:11434',aiApiKey='',aiModel,aiFallbackModel='qwen3:8b',aiFetcher=fetch}={}){
+export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch,quoteApiKey='',quoteFetcher=fetch,historyApiKey='',historyFetcher=fetch,aiEnabled=false,aiProvider='ollama',aiBaseUrl='http://127.0.0.1:11434',aiApiKey='',aiModel,aiFallbackModel='qwen3:8b',aiFetcher=fetch}={}){
   if(publicOrigin){
     let url;try{url=new URL(publicOrigin);}catch{throw new Error('APP_ORIGIN must be an http(s) origin');}
     if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('APP_ORIGIN must contain only scheme, hostname and optional port');
@@ -68,6 +70,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
     CREATE INDEX IF NOT EXISTS session_expiry ON sessions(expires_at);`);
   if(!db.prepare('PRAGMA table_info(user_state)').all().some(column=>column.name==='revision'))db.exec('ALTER TABLE user_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 0');
   db.exec('CREATE TABLE IF NOT EXISTS recovery_codes(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,code_hash TEXT NOT NULL)');
+  db.exec('CREATE TABLE IF NOT EXISTS market_feed_migrations(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE)');
   // Privacy migration: retain only followed company symbols from the former portfolio.
   for(const row of db.prepare('SELECT user_id,data FROM user_state').all()){
     let data;try{data=JSON.parse(row.data);}catch{continue;}
@@ -77,8 +80,19 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
     const migrated={watchlist,alerts,sources:Array.isArray(data.sources)?data.sources:initialState().sources};
     db.prepare('UPDATE user_state SET data=?,revision=revision+1 WHERE user_id=?').run(JSON.stringify(migrated),row.user_id);
   }
-  const news=createNewsService(db,{fetcher:newsFetcher});
+  if(quoteApiKey){
+    for(const row of db.prepare('SELECT user_id,data FROM user_state WHERE user_id NOT IN (SELECT user_id FROM market_feed_migrations)').all()){
+      let state;try{state=JSON.parse(row.data);}catch{continue;}
+      if(!Array.isArray(state.sources))continue;
+      const known=new Set(state.sources.map(source=>source.url));
+      for(const feed of marketFeeds)if(!known.has(feed.url)&&state.sources.length<50)state.sources.push({id:feed.id,name:feed.name,url:feed.url,type:'finance',symbol:feed.symbol,enabled:true});
+      db.prepare('UPDATE user_state SET data=?,revision=revision+1 WHERE user_id=?').run(JSON.stringify(state),row.user_id);
+      db.prepare('INSERT INTO market_feed_migrations VALUES(?)').run(row.user_id);
+    }
+  }
+  const news=createNewsService(db,{fetcher:newsFetcher,marketApiKey:quoteApiKey,marketFetcher:newsFetcher});
   const quotes=createQuoteService(db,{apiKey:quoteApiKey,fetcher:quoteFetcher});
+  const forecast=createForecastService(db,{apiKey:historyApiKey,fetcher:historyFetcher});
   const ai=aiProvider==='hybrid'?createAiRouter(
     createAiService(db,{enabled:aiEnabled,provider:'groq',apiKey:aiApiKey,model:aiModel,fetcher:aiFetcher}),
     createAiService(db,{enabled:aiEnabled,provider:'ollama',baseUrl:aiBaseUrl,model:aiFallbackModel,fetcher:aiFetcher})
@@ -111,7 +125,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       const origin=publicOrigin||`http://${req.headers.host}`;
       if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origin)fail(403,'คำขอไม่ได้มาจากเว็บไซต์นี้');
       const pathname=new URL(req.url,origin).pathname;
-      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.6.1'});}
+      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.7.0'});}
       if(pathname==='/api/ai/status'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
         const result=await ai.status();
@@ -125,6 +139,14 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
         const currentSymbols=new Set(userData(user).state.watchlist);
         return send(res,200,{...result,items:result.items.filter(item=>currentSymbols.has(item.symbol))});
+      }
+      if(pathname==='/api/forecast'&&req.method==='GET'){
+        const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
+        const symbol=new URL(req.url,origin).searchParams.get('symbol')?.trim().toUpperCase()||'';
+        if(!symbols.has(symbol))fail(400,'ไม่รองรับหุ้นนี้');
+        const result=await forecast.get(symbol);
+        if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+        return send(res,200,result);
       }
       if(pathname==='/api/news'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
@@ -142,7 +164,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         catch(error){
           if(error.code==='disabled')fail(503,'AI ยังไม่เปิดใช้');
           if(error.code==='not_configured')fail(503,'ยังไม่ได้ตั้งค่า Groq API key');
-          if(error.code==='no_news')fail(422,'ยังไม่มีหัวข้อข่าวสำหรับหุ้นนี้ เลือก AAPL, MSFT หรือ NVDA และเปิดฟีดข่าวของบริษัท');
+          if(error.code==='no_news')fail(422,'ยังไม่มีหัวข้อข่าวสำหรับหุ้นนี้ กรุณาเปิดแหล่งข่าวที่เกี่ยวข้อง');
           if(error.code==='providers_unavailable')fail(503,'Groq และ Ollama ยังไม่พร้อม ตรวจโควตา อินเทอร์เน็ต และ Ollama');
           fail(503,aiProvider==='groq'?'ติดต่อ Groq AI ไม่สำเร็จ ตรวจ API key โควตา และอินเทอร์เน็ต':'ติดต่อ AI ในเครื่องไม่สำเร็จ ตรวจว่าเปิด Ollama และติดตั้งโมเดลแล้ว');
         }
@@ -163,7 +185,8 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         const recoveryCode=newRecoveryCode();
         db.exec('BEGIN');try{
           db.prepare('INSERT INTO users VALUES(?,?,?,?,?,?)').run(id,email,name,salt,hash,Date.now());
-          db.prepare('INSERT INTO user_state(user_id,data) VALUES(?,?)').run(id,JSON.stringify(initialState()));
+          db.prepare('INSERT INTO user_state(user_id,data) VALUES(?,?)').run(id,JSON.stringify(initialState(!!quoteApiKey)));
+          if(quoteApiKey)db.prepare('INSERT INTO market_feed_migrations VALUES(?)').run(id);
           db.prepare('INSERT INTO recovery_codes VALUES(?,?)').run(id,tokenHash(recoveryCode));db.exec('COMMIT');
         }catch(error){db.exec('ROLLBACK');throw error;}
         return send(res,201,{message:'สร้างบัญชีแล้ว กรุณาเข้าสู่ระบบ',recoveryCode});
@@ -232,7 +255,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
   });
   server.requestTimeout=130000;server.headersTimeout=10000;
   if(refreshNews){server.once('listening',()=>{news.refresh().catch(()=>{});newsTimer=setInterval(()=>news.refresh().catch(()=>{}),15*60*1000);newsTimer.unref();});}
-  server.on('close',()=>{clearInterval(newsTimer);news.close();quotes.close();ai.close();db.close();});
+  server.on('close',()=>{clearInterval(newsTimer);news.close();quotes.close();forecast.close();ai.close();db.close();});
   return server;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
@@ -240,7 +263,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   if(!Number.isInteger(port)||port<1||port>65535)throw new Error('PORT must be an integer from 1 to 65535');
   if(!['127.0.0.1','localhost','::1'].includes(host)&&!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN before listening beyond localhost');
   const groqApiKey=process.env.GROQ_API_KEY?.trim()||'',configuredProvider=(process.env.AI_PROVIDER||'auto').trim().toLowerCase(),aiProvider=configuredProvider==='auto'?(groqApiKey?'hybrid':'ollama'):configuredProvider;
-  const server=createApp({databasePath:process.env.DATABASE_PATH?path.resolve(process.env.DATABASE_PATH):undefined,publicOrigin:process.env.APP_ORIGIN||null,refreshNews:process.env.NEWS_ENABLED!=='false',quoteApiKey:process.env.FINNHUB_API_KEY?.trim()||'',aiEnabled:process.env.AI_ENABLED!=='false',aiProvider,aiBaseUrl:process.env.OLLAMA_URL||'http://127.0.0.1:11434',aiApiKey:groqApiKey,aiModel:['groq','hybrid'].includes(aiProvider)?(process.env.GROQ_MODEL||'qwen/qwen3.8-27b'):(process.env.OLLAMA_MODEL||'qwen3:8b'),aiFallbackModel:process.env.OLLAMA_MODEL||'qwen3:8b'});
+  const server=createApp({databasePath:process.env.DATABASE_PATH?path.resolve(process.env.DATABASE_PATH):undefined,publicOrigin:process.env.APP_ORIGIN||null,refreshNews:process.env.NEWS_ENABLED!=='false',quoteApiKey:process.env.FINNHUB_API_KEY?.trim()||'',historyApiKey:process.env.ALPHAVANTAGE_API_KEY?.trim()||'',aiEnabled:process.env.AI_ENABLED!=='false',aiProvider,aiBaseUrl:process.env.OLLAMA_URL||'http://127.0.0.1:11434',aiApiKey:groqApiKey,aiModel:['groq','hybrid'].includes(aiProvider)?(process.env.GROQ_MODEL||'qwen/qwen3.8-27b'):(process.env.OLLAMA_MODEL||'qwen3:8b'),aiFallbackModel:process.env.OLLAMA_MODEL||'qwen3:8b'});
   server.listen(port,host,()=>console.log(`StockLens: http://${host}:${server.address().port}`));
   server.on('error',error=>{console.error(error.code==='EADDRINUSE'?`พอร์ต ${port} ถูกใช้อยู่แล้ว ตั้งค่า PORT เป็นหมายเลขอื่น`:error.message);process.exitCode=1;});
   for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{server.close();server.closeIdleConnections();});
