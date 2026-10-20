@@ -1,4 +1,4 @@
-# คู่มือ StockLens 0.5 — ข่าวบริษัทสหรัฐฯ / PWA
+# คู่มือ StockLens 0.6.1 — ข่าวบริษัทสหรัฐฯ / PWA
 
 **อัปเดต 0.6.0:** รองรับ GroqCloud Free Plan สำหรับ AI ออนไลน์ และ Ollama เป็นตัวเลือกในเครื่อง ตาม [LOCAL_AI.md](LOCAL_AI.md)
 
