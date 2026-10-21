@@ -82,9 +82,10 @@ export function createForecastService(db,{apiKey='',fetcher=fetch,now=Date.now}=
     await refresh(symbol);
     const row=db.prepare('SELECT * FROM weekly_history WHERE symbol=?').get(symbol),history=row?.data?JSON.parse(row.data):null;
     if(!history)return {symbol,configured:!!apiKey,provider:'Alpha Vantage',status:'no_history',error:row?.error??null};
+    const chart=history.prices.filter(point=>/^\d{4}-\d{2}-\d{2}$/.test(point.date)&&point.date<completedWeekCutoff(now())&&Number.isFinite(point.close)&&point.close>0).slice(-104);
     const result=evaluateTrend(history.prices,{now:now()});
-    if(result.asOf&&now()-Date.parse(result.asOf)>14*DAY)return {symbol,configured:!!apiKey,provider:'Alpha Vantage',status:'stale',asOf:result.asOf,error:row?.error??null};
-    return {symbol,configured:!!apiKey,provider:'Alpha Vantage',...result,error:row?.error??null};
+    if(result.asOf&&now()-Date.parse(result.asOf)>14*DAY)return {symbol,configured:!!apiKey,provider:'Alpha Vantage',status:'stale',asOf:result.asOf,history:chart,error:row?.error??null};
+    return {symbol,configured:!!apiKey,provider:'Alpha Vantage',...result,history:chart,error:row?.error??null};
   }
   return {get,close(){closed=true;}};
 }

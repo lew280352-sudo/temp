@@ -13,6 +13,9 @@
 ```text
 server.mjs          HTTP API, authentication, SQLite และ static assets
 ai.mjs              ตัวเชื่อม Groq/Ollama, structured output และ summary cache
+security.mjs        TOTP และการเข้ารหัสคีย์ MFA
+push.mjs            Web Push พร้อมตรวจ endpoint และกรองข่าวรายบัญชี
+email-verification.mjs ลิงก์ยืนยันอีเมลแบบครั้งเดียวผ่าน SMTP
 dist/               หน้าเว็บและสคริปต์ฝั่งเบราว์เซอร์
 test/               API, persistence และ browser tests
 scripts/backup.mjs  สำรอง SQLite ด้วย online backup API
@@ -40,6 +43,9 @@ backups/            สำเนาฐานข้อมูล (ไม่ขึ�
 | `GROQ_MODEL` | `qwen/qwen3.8-27b` | โมเดลออนไลน์ที่ใช้ structured output |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | endpoint Ollama; อนุญาตเฉพาะ localhost |
 | `OLLAMA_MODEL` | `qwen3:8b` | โมเดลที่ต้องมีใน `ollama list` |
+| `MFA_ENCRYPTION_KEY` | ว่าง | คีย์ hex 64 ตัวอักษรสำหรับเข้ารหัส TOTP seed; สร้างด้วย `node scripts/configure-mfa.mjs` และเก็บไว้เมื่อ restore |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | ว่าง | คีย์ Web Push และ URL ติดต่อ; สร้างคู่คีย์ด้วย `node scripts/configure-push.mjs` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | ว่าง | บัญชี SMTP สำหรับส่งลิงก์ยืนยันอีเมล; ไม่มีบัญชีจะไม่ส่งจริง |
 | `BROWSER_PATH` | Edge บน Windows / Playwright Chromium บนระบบอื่น | ใช้เฉพาะ browser tests |
 
 `npm start` และ `npm run backup` โหลด `.env` ถ้ามี โดย environment ที่ตั้งใน process มีลำดับก่อน คัดลอก `.env.example` ไป `.env` เพื่อปรับค่า ห้าม commit `.env` หากเรียก `node server.mjs` โดยตรงต้องตั้ง env เอง
@@ -55,6 +61,8 @@ npm.cmd run backup
 ได้ไฟล์ `backups/stocklens-<เวลา UTC>.sqlite` ใช้ SQLite online backup เพื่อให้ข้อมูลจาก WAL รวมอยู่ในไฟล์ สามารถสำรองขณะ server เปิดอยู่ ตั้ง `DATABASE_PATH` ให้ตรงกับ process แอปหากเปลี่ยนตำแหน่งฐานข้อมูล เก็บสำเนานอกเครื่องอย่างมีการควบคุมสิทธิ์
 
 ไฟล์ backup มีอีเมล password hashes รายการบริษัท/เว็บไซต์ที่สนใจ และเซสชัน จึงเป็นข้อมูลส่วนตัว ไม่ส่งขึ้น GitHub การ backup สำเร็จยังต้องทดลอง restore เป็นระยะ
+
+เมื่อเปิด MFA หรือ Web Push ให้เก็บ `MFA_ENCRYPTION_KEY` และคู่ VAPID จาก `.env` แยกอย่างปลอดภัยควบคู่ฐานข้อมูล คีย์ MFA หายจะตรวจรหัส Authenticator เดิมไม่ได้ คู่ VAPID เปลี่ยนจะทำให้การสมัครรับ Push เดิมใช้ไม่ได้ การลบบัญชีลบข้อมูลออกจากฐานข้อมูลใช้งาน แต่สำเนา backup ก่อนลบยังคงมีข้อมูลตามเวลาที่สำรอง ต้องจัดการสำเนาเหล่านั้นตามนโยบายเก็บข้อมูล
 
 ## ทดลองกู้คืนโดยไม่เขียนทับฐานข้อมูลเดิม
 
@@ -102,6 +110,12 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 | `POST /api/ai/summary` | Login + `{symbol}`; สรุปหัวข้อข่าวที่เปิดในบัญชีด้วย structured output |
 | `GET /api/health` | ตรวจ process/SQLite เท่านั้น ไม่ยืนยันว่า provider ภายนอกพร้อม |
 | `POST /api/login` | `{email,password}` รับ `{user,state,revision}` และ HttpOnly session cookie |
+| `POST /api/login` เมื่อเปิด MFA | เพิ่ม `totp` รหัส 6 หลัก; รหัสเดียวใช้ซ้ำไม่ได้ |
+| `GET /api/security` | สถานะ MFA และการยืนยันอีเมลของบัญชี |
+| `POST /api/mfa/setup`, `/api/mfa/enable`, `/api/mfa/disable` | ตั้ง Authenticator, ยืนยันรหัส และปิด MFA โดยต้องยืนยันรหัสผ่าน |
+| `POST /api/account/delete` | `{confirm,password,totp?}` ลบบัญชีและเซสชันทั้งหมด |
+| `POST /api/email/send-verification`, `/api/email/verify` | ส่งและใช้ token ยืนยันอีเมลเมื่อมี SMTP; token ดิบไม่เก็บใน DB |
+| `GET /api/push/status`, `POST /api/push/subscribe`, `/api/push/unsubscribe`, `/api/push/test` | จัดการ Web Push รายบัญชี; endpoint จำกัดเฉพาะผู้ให้บริการ Push ที่รองรับ |
 | `GET /api/session` | คืน user/state/revision ของ session หรือ user=null |
 | `PUT /api/state` | `{userId,revision,state}` ตรวจสิทธิ์และ revision; คืน state ที่ normalize แล้วและ revision ใหม่ |
 | `POST /api/logout` | body `{}` ยกเลิก session ปัจจุบัน |

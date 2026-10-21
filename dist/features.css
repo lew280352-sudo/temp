@@ -1,0 +1,7 @@
+.weekly-chart{margin:20px 0;padding:16px;border:1px solid #dfe7f1;border-radius:12px;background:#f8fbff}
+.weekly-chart figcaption{font-size:12px;font-weight:600;color:#415b78;margin-bottom:12px}
+.weekly-chart svg{display:block;width:100%;height:auto;max-height:220px}
+.chart-labels{display:flex;justify-content:space-between;gap:12px;color:#71849b;font-size:10px;margin-top:6px}
+.security-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.mfa-secret{font:700 16px ui-monospace,monospace;letter-spacing:2px;word-break:break-all;background:#edf2f8;padding:14px;border-radius:8px;user-select:all}
+@media(max-width:600px){.chart-labels{font-size:9px;flex-direction:column;gap:3px}}

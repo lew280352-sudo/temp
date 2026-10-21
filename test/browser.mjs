@@ -32,7 +32,12 @@ try{
   // A stale view must reload rather than silently overwrite a newer save.
   const snapshot=await page.evaluate(()=>fetch('/api/session').then(r=>r.json()));
   await page.evaluate(async snapshot=>{const next=structuredClone(snapshot.state);next.watchlist.push('MSFT');const r=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:snapshot.user.id,revision:snapshot.revision,state:next})});if(!r.ok)throw new Error('failed to prepare concurrent save');},snapshot);
-  await page.locator('.sidebar [data-page=alerts]').click();await page.locator('#alert-form [name=time]').fill('09:00');await page.locator('#alert-form [type=submit]').click();
+  await page.locator('.sidebar [data-page=alerts]').click();
+  await page.waitForSelector('#security-card [data-security-delete]');await page.waitForSelector('#push-card [data-push-enable]');
+  assert.equal(await page.locator('#security-card [data-security-setup]').isDisabled(),true,'MFA needs a local encryption key');
+  assert.equal(await page.locator('#push-card [data-push-enable]').isDisabled(),true,'Push needs VAPID keys');
+  await page.locator('#security-card [data-security-delete]').click();await page.waitForSelector('#account-delete-form');await page.locator('#close-modal').click();
+  await page.locator('#alert-form [name=time]').fill('09:00');await page.locator('#alert-form [type=submit]').click();
   await page.waitForFunction(()=>state.watchlist.includes('MSFT'));
   assert.deepEqual((await page.evaluate(()=>fetch('/api/session').then(r=>r.json()))).state.watchlist,['AAPL','MSFT']);
   // Expired/logout session must clear private content on the next attempted save.
