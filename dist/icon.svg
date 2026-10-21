@@ -1,1 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#283d57"/><g fill="none" stroke="#d5e4f5" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"><path d="M290 155H206a43 43 0 0 0 0 86h42a43 43 0 0 1 0 86h-84"/><path d="M340 155v172h30"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">StockLens — เลนส์มองแนวโน้ม</title>
+  <rect width="512" height="512" fill="#283d57"/>
+  <circle cx="238" cy="227" r="123" fill="#344e6c" stroke="#dbe9f7" stroke-width="22"/>
+  <path d="m327 317 73 73" fill="none" stroke="#dbe9f7" stroke-linecap="round" stroke-width="29"/>
+  <path d="m156 271 50-42 44 28 73-79" fill="none" stroke="#9dc3e9" stroke-linecap="round" stroke-linejoin="round" stroke-width="22"/>
+  <circle cx="323" cy="178" r="12" fill="#eef6ff"/>
+</svg>

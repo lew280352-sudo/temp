@@ -1,0 +1,8 @@
+.brand .brand-icon,
+.auth-story .brand .brand-icon {
+  background: #283d57 url('/icon.svg') center / cover no-repeat;
+  color: transparent;
+  font-size: 0;
+}
+
+.brand-icon span { font-size: 0; }

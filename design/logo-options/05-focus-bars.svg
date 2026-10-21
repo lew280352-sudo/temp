@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">StockLens — โฟกัสข้อมูลหุ้น</title>
+  <rect width="512" height="512" fill="#283d57"/>
+  <path d="M118 200v-37c0-25 20-45 45-45h37M312 118h37c25 0 45 20 45 45v37M394 312v37c0 25-20 45-45 45h-37M200 394h-37c-25 0-45-20-45-45v-37" fill="none" stroke="#e0ecf8" stroke-linecap="round" stroke-width="22"/>
+  <rect x="157" y="257" width="45" height="93" rx="12" fill="#789ec4"/>
+  <rect x="233" y="212" width="45" height="138" rx="12" fill="#a8c9e8"/>
+  <rect x="309" y="164" width="45" height="186" rx="12" fill="#e3f1ff"/>
+</svg>

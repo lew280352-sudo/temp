@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">StockLens — ข่าวและข้อมูล</title>
+  <rect width="512" height="512" fill="#283d57"/>
+  <rect x="116" y="135" width="280" height="276" rx="39" fill="#7899bb"/>
+  <rect x="100" y="103" width="280" height="276" rx="39" fill="#e0ecf8"/>
+  <rect x="142" y="151" width="87" height="87" rx="16" fill="#547da7"/>
+  <path d="m159 208 17-19 16 10 20-27" fill="none" stroke="#eaf5ff" stroke-linecap="round" stroke-linejoin="round" stroke-width="11"/>
+  <path d="M254 169h79M254 200h63M145 278h188M145 317h146" fill="none" stroke="#607b99" stroke-linecap="round" stroke-width="17"/>
+</svg>
