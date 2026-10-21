@@ -1,3 +1,5 @@
+import {companyIcons} from './company-icons.js';
+
 // Curated company directory, not a live exchange listing or price feed.
 export const companies = [
   ['AAPL','Apple','แอปเปิล','Technology','https://investor.apple.com/'],
@@ -23,5 +25,17 @@ export const companies = [
   ['COST','Costco','คอสต์โก','Retail','https://investor.costco.com/overview/default.aspx'],
   ['UNH','UnitedHealth Group','ยูไนเต็ดเฮลท์','Healthcare','https://www.unitedhealthgroup.com/investors.html'],
   ['XOM','Exxon Mobil','เอ็กซอนโมบิล','Energy','https://investor.exxonmobil.com/'],
-  ['BAC','Bank of America','แบงก์ออฟอเมริกา','Financials','https://investor.bankofamerica.com/']
-].map(([symbol,name,thai,sector,url])=>({symbol,name,thai,sector,url,currency:'USD'}));
+  ['BAC','Bank of America','แบงก์ออฟอเมริกา','Financials','https://investor.bankofamerica.com/'],
+  ['AVGO','Broadcom','บรอดคอม','Semiconductors','https://investors.broadcom.com/'],
+  ['ADBE','Adobe','อะโดบี','Software','https://www.adobe.com/investor-relations.html'],
+  ['CSCO','Cisco','ซิสโก้','Networking','https://investor.cisco.com/'],
+  ['IBM','IBM','ไอบีเอ็ม','Technology','https://www.ibm.com/investor/'],
+  ['UBER','Uber Technologies','อูเบอร์','Mobility','https://investor.uber.com/'],
+  ['ABNB','Airbnb','แอร์บีเอ็นบี','Travel','https://investors.airbnb.com/'],
+  ['PYPL','PayPal','เพย์พาล','Payments','https://investor.pypl.com/'],
+  ['PLTR','Palantir Technologies','พาแลนเทียร์','Software','https://investors.palantir.com/'],
+  ['SBUX','Starbucks','สตาร์บัคส์','Restaurants','https://investor.starbucks.com/'],
+  ['NKE','Nike','ไนกี้','Apparel','https://investors.nike.com/'],
+  ['HD','The Home Depot','โฮมดีโป','Retail','https://ir.homedepot.com/'],
+  ['CAT','Caterpillar','แคเทอร์พิลลาร์','Industrials','https://investors.caterpillar.com/']
+].map(([symbol,name,thai,sector,url])=>({symbol,name,thai,sector,url,currency:'USD',icon:companyIcons[symbol]||null}));

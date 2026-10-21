@@ -92,9 +92,10 @@ test('following a newly supported stock restores its Finnhub news source',async 
   async function call(route,method='GET',body,cookie){const response=await fetch(base+route,{method,headers:{Origin:base,...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};}
   assert.equal((await call('/api/register','POST',account)).status,201);
   const login=await call('/api/login','POST',account),state=login.data.state;
-  assert.equal(state.sources.filter(source=>source.url==='https://finnhub.io/?symbol=AMD').length,1);
-  state.sources=state.sources.filter(source=>source.url!=='https://finnhub.io/?symbol=AMD');state.watchlist.push('AMD');
+  assert.equal(state.sources.length,40);
+  assert.equal(state.sources.filter(source=>source.url==='https://finnhub.io/?symbol=AVGO').length,1);
+  state.sources=state.sources.filter(source=>source.url!=='https://finnhub.io/?symbol=AVGO');state.watchlist.push('AVGO');
   const saved=await call('/api/state','PUT',{userId:login.data.user.id,revision:login.data.revision,state},login.cookie);
-  assert.equal(saved.status,200);assert.deepEqual(saved.data.state.watchlist,['AMD']);
-  assert.equal(saved.data.state.sources.filter(source=>source.url==='https://finnhub.io/?symbol=AMD'&&source.enabled).length,1);
+  assert.equal(saved.status,200);assert.deepEqual(saved.data.state.watchlist,['AVGO']);
+  assert.equal(saved.data.state.sources.filter(source=>source.url==='https://finnhub.io/?symbol=AVGO'&&source.enabled).length,1);
 });

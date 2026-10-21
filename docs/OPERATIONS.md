@@ -35,7 +35,7 @@ backups/            สำเนาฐานข้อมูล (ไม่ขึ�
 | `APP_ORIGIN` | origin localhost ตาม request | origin ของเว็บ เช่น `https://your-domain.example` ไม่มี path/query/credentials |
 | `DATABASE_PATH` | `.data/stocklens.sqlite` ใต้โฟลเดอร์แอป | path ฐานข้อมูล persistent |
 | `NEWS_ENABLED` | `true` | ตั้ง `false` เพื่อปิดการดึง RSS และข่าวผ่าน Finnhub; cache เดิมยังอ่านได้พร้อมสถานะอายุ |
-| `FINNHUB_API_KEY` | ว่าง | ราคาล่าสุดและข่าวสื่อการเงินของ 24 บริษัท เก็บเฉพาะ server environment |
+| `FINNHUB_API_KEY` | ว่าง | ราคาล่าสุดและข่าวสื่อการเงินของ 36 บริษัท เก็บเฉพาะ server environment; ระวังโควตาเมื่อเพิ่มจำนวนหุ้น |
 | `ALPHAVANTAGE_API_KEY` | ว่าง | ราคาปิดย้อนหลังแบบฟรีและ backtest ของโหมดแนวโน้ม เก็บเฉพาะ server environment |
 | `AI_ENABLED` | `true` | ตั้ง `false` เพื่อปิด AI |
 | `AI_PROVIDER` | `auto` | `auto`, `groq` หรือ `ollama`; auto ใช้ Groq ก่อนแล้ว fallback ไป Ollama |

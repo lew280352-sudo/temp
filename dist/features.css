@@ -5,3 +5,10 @@
 .security-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
 .mfa-secret{font:700 16px ui-monospace,monospace;letter-spacing:2px;word-break:break-all;background:#edf2f8;padding:14px;border-radius:8px;user-select:all}
 @media(max-width:600px){.chart-labels{font-size:9px;flex-direction:column;gap:3px}}
+.company-logo.has-icon{font-size:0;overflow:hidden;background:#fff;border:1px solid #e6ebf1}
+.company-logo img{width:76%;height:76%;object-fit:contain;display:block}
+.web-news-search{margin:16px 0 20px}
+.web-news-search h2{font-size:15px;margin-bottom:6px}
+.web-news-search>p{font-size:11px;line-height:1.8;color:#73849a}
+.web-news-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:15px 0 10px}
+.web-news-actions .btn{font-size:11px}

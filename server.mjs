@@ -39,7 +39,7 @@ function validateState(input){
   });
   const a=input.alerts;
   if(!a||!['daily','news','trend'].every(k=>typeof a[k]==='boolean')||!/^([01]\d|2[0-3]):[0-5]\d$/.test(a.time)||!['watchlist','all'].includes(a.scope))fail(400,'การตั้งค่าแจ้งเตือนไม่ถูกต้อง');
-  if(!Array.isArray(input.sources)||input.sources.length>50)fail(400,'บันทึกแหล่งข้อมูลได้สูงสุด 50 เว็บไซต์');
+  if(!Array.isArray(input.sources)||input.sources.length>100)fail(400,'บันทึกแหล่งข้อมูลได้สูงสุด 100 เว็บไซต์');
   const urls=new Set(),ids=new Set();
   const sources=input.sources.map(s=>{
     if(!s||typeof s.id!=='string'||!s.id||s.id.length>80||ids.has(s.id)||typeof s.name!=='string'||!s.name.trim()||s.name.length>100||!['company','partner','finance'].includes(s.type)||!(s.symbol===''||symbols.has(s.symbol))||typeof s.enabled!=='boolean')fail(400,'ข้อมูลเว็บไซต์ไม่ถูกต้อง');
@@ -92,7 +92,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       let state;try{state=JSON.parse(row.data);}catch{continue;}
       if(!Array.isArray(state.sources))continue;
       const known=new Set(state.sources.map(source=>source.url));
-      for(const feed of marketFeeds)if(!known.has(feed.url)&&state.sources.length<50)state.sources.push({id:feed.id,name:feed.name,url:feed.url,type:'finance',symbol:feed.symbol,enabled:true});
+      for(const feed of marketFeeds)if(!known.has(feed.url)&&state.sources.length<100)state.sources.push({id:feed.id,name:feed.name,url:feed.url,type:'finance',symbol:feed.symbol,enabled:true});
       db.prepare('UPDATE user_state SET data=?,revision=revision+1 WHERE user_id=?').run(JSON.stringify(state),row.user_id);
       db.prepare('INSERT INTO market_feed_migrations VALUES(?)').run(row.user_id);
     }
@@ -157,7 +157,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       const origin=publicOrigin||`http://${req.headers.host}`;
       if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origin)fail(403,'คำขอไม่ได้มาจากเว็บไซต์นี้');
       const pathname=new URL(req.url,origin).pathname;
-      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.8.0'});}
+      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.8.1'});}
       if(pathname==='/api/ai/status'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
         const result=await ai.status();
@@ -371,7 +371,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         if(quoteApiKey)for(const symbol of state.watchlist){
           if(previous.watchlist.includes(symbol))continue;
           const feed=marketFeeds.find(item=>item.symbol===symbol);
-          if(feed&&state.sources.length<50&&!state.sources.some(source=>source.url===feed.url))state.sources.push({id:randomUUID(),name:feed.name,url:feed.url,type:'finance',symbol,enabled:true});
+          if(feed&&state.sources.length<100&&!state.sources.some(source=>source.url===feed.url))state.sources.push({id:randomUUID(),name:feed.name,url:feed.url,type:'finance',symbol,enabled:true});
         }
         const result=db.prepare('UPDATE user_state SET data=?,revision=revision+1 WHERE user_id=? AND revision=?').run(JSON.stringify(state),user.id,input.revision);
         if(!result.changes)fail(409,'ข้อมูลเปลี่ยนจากแท็บอื่นแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนแก้ไขอีกครั้ง');
@@ -383,7 +383,13 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         return send(res,200,{format:'stocklens-export-v1',exportedAt:new Date().toISOString(),...userData(user)});
       }
       if(pathname.startsWith('/api/'))fail(404,'ไม่พบ API นี้');
-      const assets={'/quotes-ui.js':['quotes-ui.js','text/javascript'],'/':['index.html','text/html'],'/index.html':['index.html','text/html'],'/verify-email.html':['verify-email.html','text/html'],'/verify-email.js':['verify-email.js','text/javascript'],'/app.js':['app.js','text/javascript'],'/auth.js':['auth.js','text/javascript'],'/security-ui.js':['security-ui.js','text/javascript'],'/push-ui.js':['push-ui.js','text/javascript'],'/styles.css':['styles.css','text/css'],'/theme.css':['theme.css','text/css'],'/logo.css':['logo.css','text/css'],'/features.css':['features.css','text/css'],'/catalog.js':['catalog.js','text/javascript'],'/pwa.js':['pwa.js','text/javascript'],'/sw.js':['sw.js','text/javascript'],'/manifest.webmanifest':['manifest.webmanifest','application/manifest+json'],'/offline.html':['offline.html','text/html'],'/icon.svg':['icon.svg','image/svg+xml'],'/icon-192.png':['icon-192.png','image/png'],'/icon-512.png':['icon-512.png','image/png'],'/apple-touch-icon.png':['apple-touch-icon.png','image/png']};
+      if(companies.some(company=>company.icon===pathname)&&['GET','HEAD'].includes(req.method)){
+        const type=pathname.endsWith('.png')?'image/png':pathname.endsWith('.webp')?'image/webp':pathname.endsWith('.gif')?'image/gif':pathname.endsWith('.bmp')?'image/bmp':'image/x-icon';
+        const data=readFileSync(path.join(root,'dist',pathname.slice(1)));
+        res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=86400'});
+        return res.end(req.method==='HEAD'?undefined:data);
+      }
+      const assets={'/quotes-ui.js':['quotes-ui.js','text/javascript'],'/':['index.html','text/html'],'/index.html':['index.html','text/html'],'/verify-email.html':['verify-email.html','text/html'],'/verify-email.js':['verify-email.js','text/javascript'],'/app.js':['app.js','text/javascript'],'/auth.js':['auth.js','text/javascript'],'/security-ui.js':['security-ui.js','text/javascript'],'/push-ui.js':['push-ui.js','text/javascript'],'/styles.css':['styles.css','text/css'],'/theme.css':['theme.css','text/css'],'/logo.css':['logo.css','text/css'],'/features.css':['features.css','text/css'],'/catalog.js':['catalog.js','text/javascript'],'/company-icons.js':['company-icons.js','text/javascript'],'/pwa.js':['pwa.js','text/javascript'],'/sw.js':['sw.js','text/javascript'],'/manifest.webmanifest':['manifest.webmanifest','application/manifest+json'],'/offline.html':['offline.html','text/html'],'/icon.svg':['icon.svg','image/svg+xml'],'/icon-192.png':['icon-192.png','image/png'],'/icon-512.png':['icon-512.png','image/png'],'/apple-touch-icon.png':['apple-touch-icon.png','image/png']};
       const asset=assets[pathname];if(!asset||!['GET','HEAD'].includes(req.method))fail(404,'ไม่พบหน้าเว็บ');
       const data=readFileSync(path.join(root,'dist',asset[0]));res.writeHead(200,{'Content-Type':asset[1]+'; charset=utf-8'});res.end(req.method==='HEAD'?undefined:data);
     }catch(error){send(res,error.status||500,{error:error.status?error.message:'ระบบขัดข้อง กรุณาลองใหม่'});if(!error.status)console.error(error.message);}

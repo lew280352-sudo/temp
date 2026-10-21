@@ -26,7 +26,20 @@ try{
   await page.locator('#source-form [name=name]').fill('Duplicate');await page.locator('#source-form [name=url]').fill('https://example.com/news');await page.locator('#source-form [type=submit]').click();await page.waitForFunction(()=>document.querySelector('#source-error').textContent.includes('มี URL'));
   await page.screenshot({path:'test-artifacts/sources-desktop.png',fullPage:true});
   await page.locator('.source-entry').last().locator('.remove').click();await page.locator('[data-source-confirm]').click();await page.waitForFunction(()=>document.querySelectorAll('.source-entry').length===4);
-  await page.locator('.sidebar [data-page=search]').click();await page.locator('#company-query').fill('แอปเปิล');assert.equal(await page.locator('.company-card').count(),1);
+  await page.locator('.sidebar [data-page=search]').click();
+  assert.equal(await page.locator('.company-card').count(),36);
+  assert.equal(await page.locator('.company-card img').count(),33);
+  await page.screenshot({path:'test-artifacts/search-desktop.png'});
+  await page.locator('#company-query').fill('PTT');assert.equal(await page.locator('.company-card').count(),0);
+  const newsSearch=await page.locator('#web-news-actions a').first().getAttribute('href');
+  assert.equal(new URL(newsSearch).searchParams.get('q'),'PTT');
+  assert.equal(await page.locator('#web-news-actions a').count(),2);
+  await page.locator('#company-query').fill('AVGO');assert.equal(await page.locator('.company-card').count(),1);
+  await page.waitForFunction(()=>{const img=document.querySelector('.company-card img');return img?.complete&&img.naturalWidth>0;});
+  await page.locator('.company-card [data-company]').click();
+  assert.equal(new URL(await page.locator('#modal-body a[href*="news.google.com"]').getAttribute('href')).searchParams.get('q'),'Broadcom AVGO');
+  await page.locator('#close-modal').click();
+  await page.locator('#company-query').fill('แอปเปิล');assert.equal(await page.locator('.company-card').count(),1);
   await page.locator('.sidebar [data-page=following]').click();assert.match(await page.locator('.company-grid').first().innerText(),/AAPL/);assert.equal(await page.locator('input[name=qty], input[name=cost]').count(),0);assert.doesNotMatch(await page.locator('#main').innerText(),/0\.125001|ต้นทุนเฉลี่ย/);
   await page.locator('.sidebar [data-page=insights]').click();await page.locator('#ai-symbol').selectOption('NVDA');assert.match(await page.locator('.ai-trend').innerText(),/ยังเริ่ม AI ไม่ได้/);
   // A stale view must reload rather than silently overwrite a newer save.
