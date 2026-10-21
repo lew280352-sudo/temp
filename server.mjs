@@ -128,7 +128,8 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
     if(researchAttempts.size>1000)for(const [id,item] of researchAttempts)if(now>=item.until)researchAttempts.delete(id);
     if(entry.count>8)fail(429,'ค้นข่าวบ่อยเกินไป กรุณารอ 15 นาที');
   }
-  const cookie=(token,age)=>`stocklens_session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secureCookies?'; Secure':''}`;
+  const publicHost=publicOrigin?new URL(publicOrigin).host:null;
+  const cookie=(token,age,req)=>`stocklens_session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secureCookies&&req.headers.host===publicHost?'; Secure':''}`;
   const send=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(data));};
   const userData=user=>{const row=user?db.prepare('SELECT data,revision FROM user_state WHERE user_id=?').get(user.id):null;return {user,state:row?JSON.parse(row.data):null,revision:row?.revision??null};};
   function currentUser(req){
@@ -164,9 +165,10 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
     res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
     try{
-      const allowed=publicOrigin?[new URL(publicOrigin).host]:[`127.0.0.1:${server.address().port}`,`localhost:${server.address().port}`];
+      const localHosts=[`127.0.0.1:${server.address().port}`,`localhost:${server.address().port}`];
+      const allowed=publicOrigin?[publicHost,...localHosts]:localHosts;
       if(!allowed.includes(req.headers.host))fail(403,'Host ไม่ได้รับอนุญาต');
-      const origin=publicOrigin||`http://${req.headers.host}`;
+      const origin=req.headers.host===publicHost?publicOrigin:`http://${req.headers.host}`;
       if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origin)fail(403,'คำขอไม่ได้มาจากเว็บไซต์นี้');
       const pathname=new URL(req.url,origin).pathname;
       if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.9.2'});}
@@ -279,7 +281,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
           db.prepare('DELETE FROM login_otp WHERE user_id=?').run(user.id);
           db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);db.exec('COMMIT');
         }catch(error){db.exec('ROLLBACK');throw error;}
-        res.setHeader('Set-Cookie',cookie('',0));return send(res,200,{ok:true,recoveryCode});
+        res.setHeader('Set-Cookie',cookie('',0,req));return send(res,200,{ok:true,recoveryCode});
       }
       if(pathname==='/api/recovery-code'&&req.method==='POST'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
@@ -391,7 +393,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         }
         db.prepare('DELETE FROM sessions WHERE expires_at<=? OR token_hash=?').run(Date.now(),tokenHash(tokenFrom(req)));
         const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(tokenHash(token),user.id,Date.now()+SESSION_AGE);
-        res.setHeader('Set-Cookie',cookie(token,SESSION_AGE/1000));
+        res.setHeader('Set-Cookie',cookie(token,SESSION_AGE/1000,req));
         return send(res,200,userData({id:user.id,name:user.name,email:user.email}));
       }
       if(pathname==='/api/login/verify'&&req.method==='POST'){
@@ -403,11 +405,11 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         if(db.prepare('SELECT secret FROM user_mfa WHERE user_id=?').get(user.id)?.secret)fail(401,'บัญชีนี้ต้องใช้รหัส Authenticator');
         db.prepare('DELETE FROM sessions WHERE expires_at<=? OR token_hash=?').run(Date.now(),tokenHash(tokenFrom(req)));
         const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(tokenHash(token),user.id,Date.now()+SESSION_AGE);
-        res.setHeader('Set-Cookie',cookie(token,SESSION_AGE/1000));
+        res.setHeader('Set-Cookie',cookie(token,SESSION_AGE/1000,req));
         return send(res,200,userData(user));
       }
       if(pathname==='/api/logout'&&req.method==='POST'){
-        await body(req);db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash(tokenFrom(req)));res.setHeader('Set-Cookie',cookie('',0));return send(res,200,{ok:true});
+        await body(req);db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash(tokenFrom(req)));res.setHeader('Set-Cookie',cookie('',0,req));return send(res,200,{ok:true});
       }
       if(pathname==='/api/account/delete'&&req.method==='POST'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
@@ -416,7 +418,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         if(input.confirm!==user.email)fail(400,'กรอกอีเมลให้ตรงกับบัญชีเพื่อยืนยันการลบ');
         checkMfa(user.id,input.totp,{consume:true});
         db.prepare('DELETE FROM users WHERE id=?').run(user.id);
-        res.setHeader('Set-Cookie',cookie('',0));
+        res.setHeader('Set-Cookie',cookie('',0,req));
         return send(res,200,{ok:true});
       }
       if(pathname==='/api/state'&&req.method==='PUT'){
