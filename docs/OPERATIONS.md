@@ -82,7 +82,7 @@ JSON จาก `/api/export` เป็นข้อมูลเฉพาะบั
 
 ## เตรียม deploy
 
-เวอร์ชันนี้ยังไม่ได้ deploy ระบบออนไลน์ GitHub Pages/static hosting ไม่รองรับ `node:sqlite` และ API ให้เลือก Node.js host แบบ single instance พร้อมพื้นที่เก็บไฟล์ถาวร
+เวอร์ชันนี้มี HTTPS ชั่วคราวสำหรับทดสอบมือถือผ่าน Cloudflare Quick Tunnel แต่ยังไม่ได้ deploy บนโฮสต์ถาวร GitHub Pages/static hosting ไม่รองรับ `node:sqlite` และ API ให้เลือก Node.js host แบบ single instance พร้อมพื้นที่เก็บไฟล์ถาวร
 
 ตัวอย่าง environment สำหรับ runtime หลัง reverse proxy:
 
@@ -96,6 +96,12 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 ใช้ HTTPS ตั้ง proxy ให้รักษา Host ตรงกับ APP_ORIGIN; server จะออก Secure cookie เมื่อ origin เป็น HTTPS แอปไม่เชื่อ `X-Forwarded-For` โดยอัตโนมัติ จึงต้องออกแบบ rate limiting หลัง proxy ให้เหมาะสมก่อนหลายผู้ใช้ อย่าเปิดบริการทั่วไปก่อนจัดการรายการระดับสูงใน KNOWN_LIMITATIONS.md
 
 ห้ามเผยแพร่ `.data/`, `backups/`, `.env`, credentials หรือ snapshot ของผู้ใช้ ห้ามชี้ static server ไปที่โฟลเดอร์ repository ทั้งหมด ใช้ `server.mjs` ซึ่งให้บริการเฉพาะ assets ที่ระบุ
+
+### HTTPS ชั่วคราวบนเครื่องพัฒนา
+
+เครื่องนี้ใช้ `cloudflared` รุ่นที่ตรวจลายเซ็นแล้วใน `.data/bin/cloudflared.exe` เชื่อม `127.0.0.1:4173` ไปยัง Quick Tunnel พร้อม `--allowed-mail` เพื่อให้ Cloudflare ส่งรหัส OTP ไปเฉพาะอีเมลที่อนุญาต คอมยังเก็บ SQLite และ API keys ไว้ในเครื่อง ลิงก์และ PID ปัจจุบันอยู่ใน `.data/mobile-preview.json` ซึ่ง Git ไม่ติดตาม และเซิร์ฟเวอร์ต้องเริ่มด้วย `APP_ORIGIN` ที่ตรงกับลิงก์ HTTPS เพื่อให้ Host/Origin checks และ Secure cookie ทำงาน การเปิดหน้าเว็บจากภายนอกต้องผ่าน OTP ก่อน แล้วจึง Login ด้วยบัญชี StockLens
+
+ลิงก์นี้หยุดทันทีเมื่อ `cloudflared` หยุด และชื่อโฮสต์เปลี่ยนทุกครั้งที่เริ่มใหม่ เครื่องต้องเปิดและเชื่อมอินเทอร์เน็ตอยู่ตลอด ไม่มี uptime guarantee และไม่ใช่ระบบ production ตาม [เอกสาร Quick Tunnels ของ Cloudflare](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) การทดสอบจากเครื่องนี้ยืนยันว่า URL ส่งผู้ไม่ผ่าน OTP ไป `login.trycloudflare.com` และ StockLens ออก Secure cookie ภายใต้ hostname ใหม่; ผู้ใช้ต้องตรวจการรับ OTP และการใช้งานบนมือถือจริงเพิ่มเติม
 
 ## API ที่มีอยู่
 
@@ -137,7 +143,7 @@ npm.cmd run test:users
 
 API tests ตรวจ session, account isolation, revision conflict, input validation และ export; persistence tests ตรวจ restart, password hash, migration ที่ลบจำนวน/ต้นทุน, expired sessions และ backup; UI tests ตรวจ flow สมาชิก สิ่งที่ติดตาม แหล่งข้อมูล มือถือ และกรณี stale/expired session
 
-`test:users` เปิด browser contexts แยก 20 บัญชีพร้อมกัน (10 desktop, 10 mobile) และฐานข้อมูล SQLite ใหม่เฉพาะรอบ บันทึก `results.json` และภาพตัวอย่างใน `test-artifacts/users20-verified-<เวลา UTC>/` โฟลเดอร์นี้รวมฐานข้อมูลสังเคราะห์สำหรับตรวจสอบและถูก ignore จาก Git ไม่ใช้ `.data/stocklens.sqlite` ของบัญชีจริง รายงานสรุปที่เผยแพร่อยู่ใน [TEST_20_USERS.md](TEST_20_USERS.md)
+`test:users` เปิด browser contexts แยก 20 บัญชีพร้อมกัน (10 desktop, 10 mobile) และฐานข้อมูล SQLite ใหม่เฉพาะรอบ บันทึก `results.json` และภาพตัวอย่างในโฟลเดอร์ชั่วคราว `stocklens-users20-*` ของระบบ ไม่ใช้ `.data/stocklens.sqlite` ของบัญชีจริง รายงานสรุปที่เผยแพร่อยู่ใน [TEST_20_USERS.md](TEST_20_USERS.md)
 
 GitHub Actions มี configuration สำหรับ Ubuntu + Node 24 + Chromium ผลการรันจริงดูที่หน้า Actions ใน repository ยังไม่มี deploy job เพราะต้องเลือกและตั้ง host ที่รองรับ backend ก่อน
 
