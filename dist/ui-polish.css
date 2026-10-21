@@ -1,0 +1,64 @@
+/* Readable controls and clearer information hierarchy on the overview. */
+:root{--ink:#20344f;--muted:#586d86;--line:#d9e3ef}
+.btn{min-height:40px;border-color:#bdcde0;border-radius:9px;color:#28486b;font-size:12px;font-weight:700;padding:10px 15px;transition:background-color .18s,border-color .18s,box-shadow .18s,transform .18s}
+.btn:hover:not(:disabled){filter:none;background:#eef4fb;border-color:#83a5c9;box-shadow:0 3px 10px #243c5817;transform:translateY(-1px)}
+.btn.primary,.btn.primary:hover:not(:disabled){background:#244a75;border-color:#244a75;color:#fff}
+.btn.primary:hover:not(:disabled){background:#173b66;box-shadow:0 6px 16px #1d47722b}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.text-button{color:#245584;font-size:12px;font-weight:700;min-height:32px}
+.text-button:hover:not(:disabled){color:#123d68;text-decoration:underline;text-underline-offset:3px}
+.subtitle,.small-note,.form-help{color:#61758e}
+.daily-brief{background:linear-gradient(135deg,#eaf2fb 0%,#dfeaf7 100%);border-color:#cadcf0}
+.daily-brief h2{color:#203c5c;font-weight:700;line-height:1.45}
+.daily-brief p{color:#49637e;font-size:12px;line-height:1.8}
+.brief-bottom{color:#365577;font-size:12px;font-weight:600}
+.brief-bottom .text-button{display:inline-flex;background:#fff;color:#245584;border:1px solid #bfd2e7;border-radius:8px;padding:8px 12px;white-space:nowrap}
+.brief-bottom .text-button:hover{background:#f5faff;text-decoration:none}
+.right-column>.card .small-label{color:#506986;font-size:11px;font-weight:700}
+.right-column>.card .small-note{font-size:11px}
+.right-column>.card [data-page="following"]{width:100%;background:#eef4fb;border-color:#b9cee5;color:#224b78}
+.section-title h2{color:#253d5a;font-size:16px;font-weight:700}
+.section-title [data-refresh-news]{border:1px solid #b9cee5;border-radius:8px;padding:7px 12px;background:#f5f9fd}
+.section-title [data-refresh-news]:hover{background:#e9f2fc;text-decoration:none}
+.tabs{gap:8px}
+.tab{border:1px solid #c8d7e8;border-radius:8px;color:#476582;font-size:11px;font-weight:600;padding:8px 12px}
+.tab:hover{background:#f0f5fb}
+.tab.active{background:#dfeaf7;border-color:#a9c2df;color:#214b78}
+.news-card{grid-template-columns:38px minmax(0,1fr);gap:12px;align-items:start;border:1px solid #dce6f1;border-radius:11px;background:#fff;padding:15px;margin:10px 0;transition:border-color .18s,box-shadow .18s}
+.news-card:hover{border-color:#a9c3df;box-shadow:0 5px 18px #1e426115}
+.news-card .company-logo{width:36px;height:36px}
+.news-meta{color:#526987;font-size:10px;gap:8px}
+.ticker-tag{background:#eaf1f9;border-radius:5px;color:#24517e;font-size:10px;padding:3px 6px}
+.news-title{color:#1e3e63;font-size:14px;font-weight:650;line-height:1.55;padding:8px 0 6px}
+.news-title:hover{color:#0c69ad;text-decoration:underline;text-underline-offset:3px}
+.news-footer{color:#60758e;font-size:10px;line-height:1.6;display:flex;gap:5px 12px;flex-wrap:wrap}
+.news-list .news-card:last-child{padding-bottom:15px}
+.feed-status{color:#405b78}
+.ai-card{background:linear-gradient(160deg,#213d5f,#1d334f);border:1px solid #335474;border-radius:14px;box-shadow:0 12px 28px #162e4930;color:#fff;padding:24px}
+.ai-card .section-title{align-items:flex-start;gap:12px;margin-bottom:18px}
+.ai-card .section-title h2{color:#fff;font-size:17px}
+.ai-badge{background:#345577;border:1px solid #668cb4;border-radius:6px;color:#f0f7ff;font-size:10px;font-weight:600;letter-spacing:0;line-height:1.3;padding:5px 8px;text-align:center}
+.ai-stock.field{display:flex;flex-direction:column;gap:8px;align-items:stretch;position:relative;margin:0 0 20px;color:#dce9f8;font-size:12px;font-weight:700}
+.ai-card .ai-stock select{appearance:none;-webkit-appearance:none;width:100%;min-height:46px;border:1px solid #a7c3df;border-radius:9px;background:#f8fbff;color:#173b60;font-size:14px;font-weight:650;line-height:1.4;padding:10px 42px 10px 14px;box-shadow:0 2px 7px #112c4626;cursor:pointer}
+.ai-stock:after{content:"";position:absolute;right:17px;bottom:18px;width:8px;height:8px;border-right:2px solid #365d82;border-bottom:2px solid #365d82;transform:rotate(45deg);pointer-events:none}
+.ai-stock select option{background:#fff;color:#173b60}
+.ai-stock select:hover{border-color:#6e9ac7}
+.ai-stock select:focus-visible{outline:3px solid #a3caff;outline-offset:2px}
+.ai-trend{display:block;color:#fff;font-size:clamp(19px,1.5vw,24px);font-weight:700;line-height:1.48;letter-spacing:-.25px;margin:12px 0}
+.ai-card>p{color:#e0ebf7;font-size:12px;line-height:1.8;margin:0 0 16px}
+.ai-confidence{color:#d3e5f8;background:#ffffff12;border:1px solid #ffffff24;border-radius:8px;font-size:10px;line-height:1.65;margin:0 0 18px;padding:9px 11px}
+.ai-detail{background:#ffffff0c;border:1px solid #ffffff24;border-radius:9px;color:#e4eef9;font-size:11px;line-height:1.75;margin:10px 0;padding:13px 15px}
+.ai-detail b{color:#fff;font-size:12px;margin-bottom:8px}
+.ai-detail ul{list-style:none;margin:0;padding:0}
+.ai-detail li{position:relative;margin:8px 0;padding-left:16px}
+.ai-detail li:before{content:"";position:absolute;left:0;top:.72em;width:6px;height:6px;border-radius:50%;background:#8dc1f2}
+.ai-sources{border-top:1px solid #6380a0;color:#d3e5f8;font-size:11px;margin-top:18px;padding-top:16px}
+.ai-sources b{color:#fff;font-size:12px}
+.ai-sources a{color:#cce8ff;line-height:1.6;margin:10px 0;overflow-wrap:anywhere}
+.ai-sources a:hover{color:#fff}
+.ai-card [data-ai-summary]{background:#d4e9ff;border:1px solid #d4e9ff;color:#153e68;font-size:12px;margin-top:20px;min-height:43px;width:100%}
+.ai-card [data-ai-summary]:hover:not(:disabled){background:#fff;border-color:#fff;color:#153e68}
+.ai-card [data-ai-summary]:disabled{opacity:1;background:#8ba6c2;border-color:#8ba6c2;color:#173450;cursor:not-allowed}
+.ai-card .risk-inline{border-color:#577493;color:#c9d9e9;font-size:10px;line-height:1.65;margin-top:18px}
+@media(max-width:740px){.page-header{display:block}.heading-actions{margin-top:14px}.heading-actions .btn{width:100%;min-height:44px;margin-top:0;padding:10px 12px;font-size:12px;white-space:normal;line-height:1.4}.news-card{margin:9px 0;padding:13px;gap:10px}.news-title{font-size:13px}.news-footer{font-size:10px}.ai-card{padding:20px}.ai-trend{font-size:20px}.daily-brief p{font-size:12px}.brief-bottom .text-button{font-size:11px}.right-column>.card .small-note{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.btn,.news-card{transition:none}.btn:hover:not(:disabled){transform:none}}
