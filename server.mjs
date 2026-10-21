@@ -6,7 +6,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { companies } from './dist/catalog.js';
-import { feeds, createNewsService } from './feeds.mjs';
+import { feeds, verifiedFeeds, createNewsService } from './feeds.mjs';
 import {marketFeeds} from './market-news.mjs';
 import { createQuoteService } from './quotes.mjs';
 import {createForecastService} from './forecast.mjs';
@@ -41,7 +41,8 @@ function validateState(input){
   const sources=input.sources.map(s=>{
     if(!s||typeof s.id!=='string'||!s.id||s.id.length>80||ids.has(s.id)||typeof s.name!=='string'||!s.name.trim()||s.name.length>100||!['company','partner','finance'].includes(s.type)||!(s.symbol===''||symbols.has(s.symbol))||typeof s.enabled!=='boolean')fail(400,'ข้อมูลเว็บไซต์ไม่ถูกต้อง');
     const url=normalizeSourceUrl(s.url);if(urls.has(url))fail(400,'มี URL นี้ในรายการแล้ว');urls.add(url);ids.add(s.id);
-    return {id:s.id,name:s.name.trim(),url,type:s.type,symbol:s.symbol,enabled:s.enabled};
+    const approved=verifiedFeeds.find(feed=>feed.url===url);
+    return {id:s.id,name:approved?.name||s.name.trim(),url,type:approved?'finance':s.type,symbol:approved?'':s.symbol,enabled:s.enabled};
   });
   return {watchlist,alerts:{daily:a.daily,news:a.news,trend:a.trend,time:a.time,scope:a.scope},sources};
 }
@@ -90,7 +91,14 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       db.prepare('INSERT INTO market_feed_migrations VALUES(?)').run(row.user_id);
     }
   }
-  const news=createNewsService(db,{fetcher:newsFetcher,marketApiKey:quoteApiKey,marketFetcher:newsFetcher});
+  const selectedFeeds=()=>{
+    const urls=new Set();
+    for(const row of db.prepare('SELECT data FROM user_state').all()){
+      try{for(const source of JSON.parse(row.data).sources||[])if(source.enabled)urls.add(source.url);}catch{}
+    }
+    return verifiedFeeds.filter(feed=>urls.has(feed.url));
+  };
+  const news=createNewsService(db,{fetcher:newsFetcher,marketApiKey:quoteApiKey,marketFetcher:newsFetcher,selectedFeeds});
   const quotes=createQuoteService(db,{apiKey:quoteApiKey,fetcher:quoteFetcher});
   const forecast=createForecastService(db,{apiKey:historyApiKey,fetcher:historyFetcher});
   const ai=aiProvider==='hybrid'?createAiRouter(
@@ -150,9 +158,11 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       }
       if(pathname==='/api/news'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
+        await news.refreshSelected();
+        if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
         const snapshot=news.snapshot(),sources=userData(user).state.sources;
         const enabled=new Set(snapshot.sources.filter(feed=>sources.some(source=>source.enabled&&source.url.replace(/\/$/,'')===feed.url.replace(/\/$/,''))).map(feed=>feed.id));
-        return send(res,200,{...snapshot,items:snapshot.items.filter(item=>enabled.has(item.feedId)),sources:snapshot.sources.map(feed=>({...feed,enabled:enabled.has(feed.id)}))});
+        return send(res,200,{...snapshot,items:snapshot.items.filter(item=>enabled.has(item.feedId)),sources:snapshot.sources.filter(feed=>sources.some(source=>source.url.replace(/\/$/,'')===feed.url.replace(/\/$/,''))).map(feed=>({...feed,enabled:enabled.has(feed.id)}))});
       }
       if(pathname==='/api/ai/summary'&&req.method==='POST'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
@@ -238,6 +248,12 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         if(input.userId!==user.id)fail(409,'บัญชีเปลี่ยนไป กรุณาเข้าสู่ระบบใหม่ก่อนบันทึก');
         if(!Number.isSafeInteger(input.revision)||input.revision<0)fail(400,'เวอร์ชันข้อมูลไม่ถูกต้อง');
         const state=validateState(input.state);
+        const previous=userData(user).state;
+        if(quoteApiKey)for(const symbol of state.watchlist){
+          if(previous.watchlist.includes(symbol))continue;
+          const feed=marketFeeds.find(item=>item.symbol===symbol);
+          if(feed&&state.sources.length<50&&!state.sources.some(source=>source.url===feed.url))state.sources.push({id:randomUUID(),name:feed.name,url:feed.url,type:'finance',symbol,enabled:true});
+        }
         const result=db.prepare('UPDATE user_state SET data=?,revision=revision+1 WHERE user_id=? AND revision=?').run(JSON.stringify(state),user.id,input.revision);
         if(!result.changes)fail(409,'ข้อมูลเปลี่ยนจากแท็บอื่นแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนแก้ไขอีกครั้ง');
         return send(res,200,{ok:true,state,revision:input.revision+1});

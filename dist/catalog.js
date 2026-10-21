@@ -11,5 +11,17 @@ export const companies = [
   ['JPM','JPMorgan Chase','เจพีมอร์แกน','Financials','https://www.jpmorganchase.com/ir'],
   ['V','Visa','วีซ่า','Payments','https://investor.visa.com/'],
   ['WMT','Walmart','วอลมาร์ท','Retail','https://stock.walmart.com/'],
-  ['KO','Coca-Cola','โคคาโคล่า','Consumer staples','https://investors.coca-colacompany.com/']
+  ['KO','Coca-Cola','โคคาโคล่า','Consumer staples','https://investors.coca-colacompany.com/'],
+  ['AMD','Advanced Micro Devices','เอเอ็มดี','Semiconductors','https://ir.amd.com/'],
+  ['INTC','Intel','อินเทล','Semiconductors','https://www.intc.com/'],
+  ['ORCL','Oracle','ออราเคิล','Technology','https://investor.oracle.com/home/default.aspx'],
+  ['CRM','Salesforce','เซลส์ฟอร์ซ','Technology','https://investor.salesforce.com/'],
+  ['NFLX','Netflix','เน็ตฟลิกซ์','Entertainment','https://ir.netflix.net/'],
+  ['DIS','Walt Disney','ดิสนีย์','Entertainment','https://investors.thewaltdisneycompany.com/overview/default.aspx'],
+  ['PEP','PepsiCo','เป๊ปซี่โค','Consumer staples','https://www.pepsico.com/investors'],
+  ['MCD','McDonald’s','แมคโดนัลด์','Restaurants','https://corporate.mcdonalds.com/corpmcd/investors.html'],
+  ['COST','Costco','คอสต์โก','Retail','https://investor.costco.com/overview/default.aspx'],
+  ['UNH','UnitedHealth Group','ยูไนเต็ดเฮลท์','Healthcare','https://www.unitedhealthgroup.com/investors.html'],
+  ['XOM','Exxon Mobil','เอ็กซอนโมบิล','Energy','https://investor.exxonmobil.com/'],
+  ['BAC','Bank of America','แบงก์ออฟอเมริกา','Financials','https://investor.bankofamerica.com/']
 ].map(([symbol,name,thai,sector,url])=>({symbol,name,thai,sector,url,currency:'USD'}));

@@ -18,13 +18,13 @@ try{
   await page.locator('[name=name]').fill('PWA Test');await page.locator('[name=email]').fill('pwa@example.com');await page.locator('[name=password]').fill('pwa-original-password');await page.locator('[name=confirm]').fill('pwa-original-password');await page.locator('#register-form [type=submit]').click();await page.waitForSelector('#login-form');
   const code=await page.locator('[aria-label="รหัสกู้คืน"]').inputValue();assert.equal(code.length,48);
   await page.locator('#login-form [name=password]').fill('pwa-original-password');await page.locator('#login-form [type=submit]').click();await page.waitForSelector('.news-card');
-  assert.equal(await page.locator('.news-card').count(),3);assert.equal(await page.locator('.news-card img').count(),0);
+  assert.equal(await page.locator('.news-card').count(),feeds.length);assert.equal(await page.locator('.news-card img').count(),0);
   await page.locator('[data-action=add]').first().click();await page.locator('#following-form [name=symbol]').selectOption('AAPL');await page.locator('#following-form [type=submit]').click();await page.waitForSelector('#modal:not([open])',{state:'attached'});
   await page.waitForFunction(()=>document.querySelector('#quotes-panel')?.textContent.includes('$200.00'));assert.match(await page.locator('#quotes-panel').innerText(),/ไม่เก็บจำนวนหุ้นและต้นทุน/);
   await page.locator('[data-refresh-quotes]').click();await page.waitForFunction(()=>!quoteBusy);assert.equal((await page.evaluate(()=>fetch('/api/quotes').then(r=>r.json()))).items[0].quote.price,200);
   await page.locator('[data-filter=watchlist]').click();assert.equal(await page.locator('.news-card').count(),1);assert.match(await page.locator('.news-card').innerText(),/AAPL/);
   await page.locator('.topbar [data-page=sources]').click();const off=page.waitForResponse(r=>r.url().endsWith('/api/state')&&r.request().method()==='PUT');await page.locator('[data-source-toggle=apple]').uncheck();assert.equal((await off).status(),200);await page.waitForFunction(()=>!isSaving);
-  const filtered=await page.evaluate(()=>fetch('/api/news').then(r=>r.json()));assert.equal(filtered.items.length,2);assert.ok(!filtered.items.some(n=>n.symbol==='AAPL'));
+  const filtered=await page.evaluate(()=>fetch('/api/news').then(r=>r.json()));assert.equal(filtered.items.length,feeds.length-1);assert.ok(!filtered.items.some(n=>n.symbol==='AAPL'));
   await page.locator('[data-source-remove=microsoft]').click();await page.locator('[data-source-confirm=microsoft]').click();await page.waitForSelector('[data-add-feed=microsoft]');
   await page.locator('[data-add-feed=microsoft]').click();await page.waitForFunction(()=>!document.querySelector('[data-add-feed=microsoft]'));
   const restored=await page.evaluate(()=>fetch('/api/news').then(r=>r.json()));assert.ok(restored.items.some(n=>n.symbol==='MSFT'));

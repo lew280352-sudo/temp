@@ -20,12 +20,12 @@ try{
   await page.locator('[data-action=add]').first().click();await page.locator('#following-form [name=symbol]').selectOption('AAPL');await page.locator('#following-form [type=submit]').click();await page.waitForSelector('#modal:not([open])',{state:'attached'});
   await page.screenshot({path:'test-artifacts/dashboard-desktop.png',fullPage:true});
   await page.locator('.sidebar [data-page=sources]').click();await page.waitForSelector('#source-form');
-  assert.equal(await page.locator('.source-entry').count(),3);
-  await page.locator('#source-form [name=name]').fill('Example News');await page.locator('#source-form [name=url]').fill('https://example.com/news');await page.locator('#source-form [type=submit]').click();await page.waitForFunction(()=>document.querySelectorAll('.source-entry').length===4);
-  await page.reload();await page.waitForSelector('body:not(.signed-out)');await page.locator('.sidebar [data-page=sources]').click();assert.equal(await page.locator('.source-entry').count(),4);
+  assert.equal(await page.locator('.source-entry').count(),4);
+  await page.locator('#source-form [name=name]').fill('Example News');await page.locator('#source-form [name=url]').fill('https://example.com/news');await page.locator('#source-form [type=submit]').click();await page.waitForFunction(()=>document.querySelectorAll('.source-entry').length===5);
+  await page.reload();await page.waitForSelector('body:not(.signed-out)');await page.locator('.sidebar [data-page=sources]').click();assert.equal(await page.locator('.source-entry').count(),5);
   await page.locator('#source-form [name=name]').fill('Duplicate');await page.locator('#source-form [name=url]').fill('https://example.com/news');await page.locator('#source-form [type=submit]').click();await page.waitForFunction(()=>document.querySelector('#source-error').textContent.includes('มี URL'));
   await page.screenshot({path:'test-artifacts/sources-desktop.png',fullPage:true});
-  await page.locator('.source-entry').last().locator('.remove').click();await page.locator('[data-source-confirm]').click();await page.waitForFunction(()=>document.querySelectorAll('.source-entry').length===3);
+  await page.locator('.source-entry').last().locator('.remove').click();await page.locator('[data-source-confirm]').click();await page.waitForFunction(()=>document.querySelectorAll('.source-entry').length===4);
   await page.locator('.sidebar [data-page=search]').click();await page.locator('#company-query').fill('แอปเปิล');assert.equal(await page.locator('.company-card').count(),1);
   await page.locator('.sidebar [data-page=following]').click();assert.match(await page.locator('.company-grid').first().innerText(),/AAPL/);assert.equal(await page.locator('input[name=qty], input[name=cost]').count(),0);assert.doesNotMatch(await page.locator('#main').innerText(),/0\.125001|ต้นทุนเฉลี่ย/);
   await page.locator('.sidebar [data-page=insights]').click();await page.locator('#ai-symbol').selectOption('NVDA');assert.match(await page.locator('.ai-trend').innerText(),/ยังเริ่ม AI ไม่ได้/);

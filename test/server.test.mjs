@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {createApp,initialState,normalizeSourceUrl} from '../server.mjs';
+import {verifiedFeeds} from '../feeds.mjs';
 
 test('registration, sessions, isolated news preferences, source validation and logout',async t=>{
   const server=createApp({databasePath:':memory:'});server.listen(0,'127.0.0.1');await once(server,'listening');
@@ -39,7 +40,7 @@ test('registration, sessions, isolated news preferences, source validation and l
   const invalid=structuredClone(state);invalid.watchlist.push('AAPL');assert.equal((await call('/api/state',{method:'PUT',cookie,body:invalid})).status,400);
   assert.equal((await call('/api/state',{method:'PUT',cookie,body:state,origin:'https://evil.example'})).status,403);
   const bob={name:'Bob',email:'bob@example.com',password:'different-test-password'};await call('/api/register',{method:'POST',body:bob});
-  const bobLogin=await call('/api/login',{method:'POST',body:bob});assert.equal(bobLogin.data.state.watchlist.length,0);assert.equal(bobLogin.data.state.sources.length,3);
+  const bobLogin=await call('/api/login',{method:'POST',body:bob});assert.equal(bobLogin.data.state.watchlist.length,0);assert.equal(bobLogin.data.state.sources.length,initialState().sources.length);
   const bobCookie=bobLogin.cookie.split(';')[0];
   assert.equal((await call('/api/state',{method:'PUT',cookie:bobCookie,body:state,expectedUserId:login.data.user.id})).status,409,'account switch cannot write Alice data to Bob');
   assert.equal((await call('/api/session',{cookie:bobCookie})).data.state.watchlist.length,0);
@@ -56,4 +57,44 @@ test('registration, sessions, isolated news preferences, source validation and l
 test('URL normalization preserves public source links',()=>{
   assert.equal(normalizeSourceUrl('https://example.com/news#section'),'https://example.com/news');
   for(const url of ['file:///etc/passwd','data:text/html,x','https://127.1','http://192.168.1.2','http://localhost:4173','ftp://example.com'])assert.throws(()=>normalizeSourceUrl(url));
+});
+
+test('reviewed RSS URLs produce account-isolated news while other URLs remain bookmarks',async t=>{
+  const feed=verifiedFeeds[0],xml='<rss><channel><item><title>Federal Reserve announcement</title><link>https://www.federalreserve.gov/newsevents/pressreleases/example.htm</link><pubDate>Wed, 21 Oct 2026 12:00:00 GMT</pubDate></item></channel></rss>';
+  let calls=0;
+  const server=createApp({databasePath:':memory:',newsFetcher:async url=>{calls++;assert.equal(url,feed.feedUrl);return new Response(xml);}});
+  server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(resolve=>server.close(resolve)));
+  const base=`http://127.0.0.1:${server.address().port}`;
+  async function request(route,{method='GET',body,cookie}={}){
+    const response=await fetch(base+route,{method,headers:{Origin:base,...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
+    return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+  }
+  const alice={name:'Alice',email:'alice-feed@example.com',password:'correct-test-password'};
+  const bob={name:'Bob',email:'bob-feed@example.com',password:'correct-test-password'};
+  await request('/api/register',{method:'POST',body:alice});await request('/api/register',{method:'POST',body:bob});
+  const a=await request('/api/login',{method:'POST',body:alice}),b=await request('/api/login',{method:'POST',body:bob});
+  a.data.state.sources.push({id:'fed-choice',name:'My label',url:feed.url,type:'partner',symbol:'AAPL',enabled:true});
+  const saveA=await request('/api/state',{method:'PUT',cookie:a.cookie,body:{userId:a.data.user.id,revision:a.data.revision,state:a.data.state}});
+  assert.equal(saveA.status,200);assert.equal(saveA.data.state.sources.at(-1).name,feed.name);assert.equal(saveA.data.state.sources.at(-1).symbol,'');
+  const aliceNews=await request('/api/news',{cookie:a.cookie});assert.equal(aliceNews.status,200);assert.equal(aliceNews.data.items.length,1);assert.equal(aliceNews.data.items[0].sourceType,'macro');assert.equal(calls,1);
+  const bobNews=await request('/api/news',{cookie:b.cookie});assert.equal(bobNews.status,200);assert.equal(bobNews.data.items.length,0);assert.ok(!bobNews.data.sources.some(source=>source.id===feed.id));
+  b.data.state.sources.push({id:'bookmark',name:'Unknown site',url:'https://example.com/rss.xml',type:'finance',symbol:'',enabled:true});
+  assert.equal((await request('/api/state',{method:'PUT',cookie:b.cookie,body:{userId:b.data.user.id,revision:b.data.revision,state:b.data.state}})).status,200);
+  await request('/api/news',{cookie:b.cookie});assert.equal(calls,1,'arbitrary URL is never fetched');
+  saveA.data.state.sources.at(-1).enabled=false;
+  assert.equal((await request('/api/state',{method:'PUT',cookie:a.cookie,body:{userId:a.data.user.id,revision:saveA.data.revision,state:saveA.data.state}})).status,200);
+  assert.equal((await request('/api/news',{cookie:a.cookie})).data.items.length,0);
+});
+
+test('following a newly supported stock restores its Finnhub news source',async t=>{
+  const server=createApp({databasePath:':memory:',quoteApiKey:'fixture'});server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(resolve=>server.close(resolve)));
+  const base=`http://127.0.0.1:${server.address().port}`,account={name:'Investor',email:'new-stock@example.com',password:'correct-test-password'};
+  async function call(route,method='GET',body,cookie){const response=await fetch(base+route,{method,headers:{Origin:base,...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};}
+  assert.equal((await call('/api/register','POST',account)).status,201);
+  const login=await call('/api/login','POST',account),state=login.data.state;
+  assert.equal(state.sources.filter(source=>source.url==='https://finnhub.io/?symbol=AMD').length,1);
+  state.sources=state.sources.filter(source=>source.url!=='https://finnhub.io/?symbol=AMD');state.watchlist.push('AMD');
+  const saved=await call('/api/state','PUT',{userId:login.data.user.id,revision:login.data.revision,state},login.cookie);
+  assert.equal(saved.status,200);assert.deepEqual(saved.data.state.watchlist,['AMD']);
+  assert.equal(saved.data.state.sources.filter(source=>source.url==='https://finnhub.io/?symbol=AMD'&&source.enabled).length,1);
 });

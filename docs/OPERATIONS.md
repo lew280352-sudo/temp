@@ -32,7 +32,7 @@ backups/            สำเนาฐานข้อมูล (ไม่ขึ�
 | `APP_ORIGIN` | origin localhost ตาม request | origin ของเว็บ เช่น `https://your-domain.example` ไม่มี path/query/credentials |
 | `DATABASE_PATH` | `.data/stocklens.sqlite` ใต้โฟลเดอร์แอป | path ฐานข้อมูล persistent |
 | `NEWS_ENABLED` | `true` | ตั้ง `false` เพื่อปิดการดึง RSS และข่าวผ่าน Finnhub; cache เดิมยังอ่านได้พร้อมสถานะอายุ |
-| `FINNHUB_API_KEY` | ว่าง | ราคาล่าสุดและข่าวสื่อการเงินของ 12 บริษัท เก็บเฉพาะ server environment |
+| `FINNHUB_API_KEY` | ว่าง | ราคาล่าสุดและข่าวสื่อการเงินของ 24 บริษัท เก็บเฉพาะ server environment |
 | `ALPHAVANTAGE_API_KEY` | ว่าง | ราคาปิดย้อนหลังแบบฟรีและ backtest ของโหมดแนวโน้ม เก็บเฉพาะ server environment |
 | `AI_ENABLED` | `true` | ตั้ง `false` เพื่อปิด AI |
 | `AI_PROVIDER` | `auto` | `auto`, `groq` หรือ `ollama`; auto ใช้ Groq ก่อนแล้ว fallback ไป Ollama |
@@ -129,7 +129,7 @@ GitHub Actions มี configuration สำหรับ Ubuntu + Node 24 + Chromi
 
 ## RSS และ PWA
 
-`feeds.mjs` กำหนดปลายทางคงที่ 3 แห่ง รองรับ RSS/Atom, จำกัด 2 MiB/ฟีด, timeout 12 วินาที, ไม่ตาม redirect และปฏิเสธ DOCTYPE/ENTITY เพื่อไม่ resolve XML entity จากภายนอก อ่านเฉพาะ title/link/date ไม่โหลดบทความเต็ม URL ที่ผู้ใช้กรอกไม่เป็นปลายทาง fetch
+`feeds.mjs` กำหนดฟีดบริษัท 4 แห่งและฟีด Federal Reserve ที่ตรวจสอบแล้ว 2 รายการ รองรับ RSS/Atom จำกัด 2 MiB/ฟีด timeout 12 วินาที ไม่ตาม redirect และปฏิเสธ DOCTYPE/ENTITY เพื่อไม่ resolve XML entity จากภายนอก อ่านเฉพาะ title/link/date ไม่โหลดบทความเต็ม เซิร์ฟเวอร์ดึง URL ที่ผู้ใช้เพิ่มเฉพาะเมื่อ URL ตรงกับรายการอนุมัติทุกตัวอักษร URL อื่นเก็บเป็นบุ๊กมาร์ก การเรียกซ้ำฟีด Federal Reserve มี cooldown 15 นาทีและยังแยกข่าวตามบัญชี
 
 ดึงตอนเริ่ม server แล้วทุก 15 นาที เก็บ `news_feeds` ใน SQLite รวมใน backup เมื่อดึงไม่สำเร็จเก็บ cache เดิมและตั้ง error หากเวลาสำเร็จล่าสุดเกินหนึ่งชั่วโมงจะระบุว่าล่าช้า ปุ่มรีเฟรชใน UI อ่าน cache ไม่สร้าง upstream request ต่อผู้ใช้ แต่ละบริษัทอาจเผยแพร่ข่าวห่างกันและไม่จำเป็นต้องใหม่ทุกวัน
 
