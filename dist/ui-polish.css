@@ -5,6 +5,9 @@
 .btn.primary,.btn.primary:hover:not(:disabled){background:#244a75;border-color:#244a75;color:#fff}
 .btn.primary:hover:not(:disabled){background:#173b66;box-shadow:0 6px 16px #1d47722b}
 .btn:disabled{opacity:.55;cursor:not-allowed}
+.password-input button{right:5px;top:5px;width:36px;height:35px;display:grid;place-items:center;padding:0;border-radius:7px;color:#4f6b8d}
+.password-input button:hover{background:#eaf1f9;color:#20476f}
+.password-input button svg{display:block}
 .text-button{color:#245584;font-size:12px;font-weight:700;min-height:32px}
 .text-button:hover:not(:disabled){color:#123d68;text-decoration:underline;text-underline-offset:3px}
 .subtitle,.small-note,.form-help{color:#61758e}
