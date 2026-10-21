@@ -95,7 +95,7 @@ AI อ่านเฉพาะหัวข้อข่าว ไม่ใช่�
 
 บนมือถือ: ใช้ URL HTTPS ชั่วคราวจาก Cloudflare Quick Tunnel ที่แจ้งไว้ หรืออ่าน URL ล่าสุดใน `.data/mobile-preview.json` บนคอม เปิดด้วยอีเมลที่ได้รับอนุญาตและรหัส OTP ก่อนเข้าสู่บัญชี StockLens อีกชั้น `localhost` บนมือถือหมายถึงมือถือเอง ไม่ใช่คอม ลิงก์ Quick Tunnel เปลี่ยนทุกครั้งที่เริ่มใหม่ จึงไม่เหมาะเป็นที่อยู่ PWA ถาวร
 
-- Android: เปิด URL HTTPS ด้วย Chrome แล้วใช้ปุ่มติดตั้งหรือเมนูติดตั้งแอป
+- Android: เปิด URL HTTPS ด้วย Chrome แล้วใช้เมนูติดตั้งแอปของเบราว์เซอร์
 - iPhone: เปิด URL HTTPS ใน Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม
 
 [ข้อกำหนด PWA ตาม MDN](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable)

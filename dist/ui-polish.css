@@ -82,3 +82,4 @@
 .ai-card .risk-inline{border-color:#577493;color:#c9d9e9;font-size:10px;line-height:1.65;margin-top:18px}
 @media(max-width:740px){.page-header{display:block}.heading-actions{margin-top:14px}.heading-actions .btn{width:100%;min-height:44px;margin-top:0;padding:10px 12px;font-size:12px;white-space:normal;line-height:1.4}.news-card{margin:9px 0;padding:13px;gap:10px}.news-title{font-size:13px}.news-footer{font-size:10px}.ai-card{padding:20px}.ai-trend{font-size:20px}.daily-brief p{font-size:12px}.brief-bottom .text-button{font-size:11px}.right-column>.card .small-note{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.btn,.news-card{transition:none}.btn:hover:not(:disabled){transform:none}}
+@media(min-width:951px){.sidebar{top:0;height:100vh}}
