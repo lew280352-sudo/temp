@@ -58,3 +58,17 @@ test('auto AI falls back from an unavailable online provider to local AI',async(
   assert.equal(status.provider,'groq');assert.equal(status.fallbackAvailable,true);
   assert.equal(primaryCalls,1);assert.equal(localCalls,1);assert.equal(result.provider,'ollama');assert.equal(result.fallbackFrom,'groq');
 });
+
+test('AI Q&A cites only available headlines and admits insufficient evidence',async()=>{
+  const db=new DatabaseSync(':memory:');let answer={answer:'หัวข้อระบุผลิตภัณฑ์ใหม่',supported:true,sourceIds:['one','invented']};
+  const fetcher=async()=>Response.json({message:{content:JSON.stringify(answer)}});
+  const ai=createAiService(db,{fetcher});
+  const item={id:'one',symbol:'AAPL',source:'Apple Newsroom',title:'Apple introduces a new product',url:'https://www.apple.com/newsroom/example',publishedAt:'2026-10-19T00:00:00Z'};
+  const result=await ai.ask('AAPL','มีข่าวอะไรบ้าง?',[item]);
+  assert.equal(result.supported,true);assert.equal(result.sources.length,1);assert.equal(result.sources[0].id,'one');assert.ok(result.answeredAt);
+  answer={answer:'ขึ้นแน่นอน',supported:true,sourceIds:['invented']};
+  const unsupported=await ai.ask('AAPL','หุ้นจะขึ้นไหม?',[item]);
+  assert.equal(unsupported.supported,false);assert.deepEqual(unsupported.sources,[]);assert.doesNotMatch(unsupported.answer,/ขึ้นแน่นอน/);
+  await assert.rejects(()=>ai.ask('MSFT','อะไร?', [item]),error=>error.code==='no_news');
+  ai.close();db.close();
+});

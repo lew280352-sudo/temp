@@ -2,7 +2,30 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {createApp,initialState,normalizeSourceUrl} from '../server.mjs';
-import {verifiedFeeds} from '../feeds.mjs';
+import {feeds,verifiedFeeds} from '../feeds.mjs';
+
+test('AI follow-up questions require a signed-in user and the same enabled headlines',async t=>{
+  const feed=feeds.find(item=>item.symbol==='AAPL');
+  assert.ok(feed);
+  const server=createApp({databasePath:':memory:',aiEnabled:true,aiFetcher:async(url,options)=>url.endsWith('/api/tags')?Response.json({models:[{name:'qwen3:8b'}]}):Response.json({message:{content:JSON.stringify(JSON.parse(options.body).format?.properties?.sourceIds?{answer:'ประกาศผลิตภัณฑ์ใหม่',supported:true,sourceIds:[JSON.parse(JSON.parse(options.body).messages[1].content).articles[0].id]}:{title:'สรุป Apple',summary:'มีประกาศผลิตภัณฑ์ใหม่',facts:[],positiveFactors:[],risks:[],unknowns:[],confidence:'low'})}}),newsFetcher:async()=>new Response('<rss><channel><item><title>Apple introduces a new product</title><link>https://www.apple.com/newsroom/example</link><pubDate>Wed, 21 Oct 2026 12:00:00 GMT</pubDate></item></channel></rss>')});
+  server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(resolve=>server.close(resolve)));
+  const base=`http://127.0.0.1:${server.address().port}`;
+  async function call(route,{method='GET',data,cookie}={}){const response=await fetch(base+route,{method,headers:{Origin:base,...(cookie?{Cookie:cookie}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined});return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};}
+  const account={name:'AI Tester',email:'ai-qa@example.com',password:'test-password-123'};
+  await call('/api/register',{method:'POST',data:account});const login=await call('/api/login',{method:'POST',data:account}),cookie=login.cookie;
+  assert.equal((await call('/api/ai/ask',{method:'POST',data:{symbol:'AAPL',question:'ข่าวนี้เกี่ยวกับอะไร?',articleIds:['one']}})).status,401);
+  assert.equal((await call('/api/ai/ask',{method:'POST',cookie,data:{symbol:'AAPL',question:'สั้น',articleIds:['one']}})).status,400);
+  await call('/api/news',{cookie});
+  const summary=await call('/api/ai/summary',{method:'POST',cookie,data:{symbol:'AAPL'}});
+  assert.equal(summary.status,200);assert.equal(summary.data.articles.length,1);
+  const articleId=summary.data.articles[0].id;
+  const answer=await call('/api/ai/ask',{method:'POST',cookie,data:{symbol:'AAPL',question:'ข่าวนี้เกี่ยวกับอะไร?',articleIds:[articleId]}});
+  assert.equal(answer.status,200);assert.equal(answer.data.sources[0].id,articleId);
+  assert.equal((await call('/api/ai/ask',{method:'POST',cookie,data:{symbol:'AAPL',question:'ข่าวนี้เกี่ยวกับอะไร?',articleIds:['fake-id']}})).status,409);
+  const changed=structuredClone(login.data.state);changed.sources=changed.sources.map(source=>source.url===feed.url?{...source,enabled:false}:source);
+  const saved=await call('/api/state',{method:'PUT',cookie,data:{userId:login.data.user.id,revision:login.data.revision,state:changed}});assert.equal(saved.status,200);
+  assert.equal((await call('/api/ai/ask',{method:'POST',cookie,data:{symbol:'AAPL',question:'ข่าวนี้เกี่ยวกับอะไร?',articleIds:[articleId]}})).status,409);
+});
 
 test('registration, sessions, isolated news preferences, source validation and logout',async t=>{
   const server=createApp({databasePath:':memory:'});server.listen(0,'127.0.0.1');await once(server,'listening');

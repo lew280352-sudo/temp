@@ -121,12 +121,20 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
   const newRecoveryCode=()=>randomBytes(24).toString('hex');
   const attempts=new Map();
   const researchAttempts=new Map();
+  const aiQuestionAttempts=new Map();
   function limitResearch(user){
     const now=Date.now(),entry=researchAttempts.get(user.id)||{count:0,until:now+15*60*1000};
     if(now>=entry.until){entry.count=0;entry.until=now+15*60*1000;}
     entry.count++;researchAttempts.set(user.id,entry);
     if(researchAttempts.size>1000)for(const [id,item] of researchAttempts)if(now>=item.until)researchAttempts.delete(id);
     if(entry.count>8)fail(429,'ค้นข่าวบ่อยเกินไป กรุณารอ 15 นาที');
+  }
+  function limitAiQuestion(user){
+    const now=Date.now(),entry=aiQuestionAttempts.get(user.id)||{count:0,until:now+15*60*1000};
+    if(now>=entry.until){entry.count=0;entry.until=now+15*60*1000;}
+    entry.count++;aiQuestionAttempts.set(user.id,entry);
+    if(aiQuestionAttempts.size>1000)for(const [id,item] of aiQuestionAttempts)if(now>=item.until)aiQuestionAttempts.delete(id);
+    if(entry.count>10)fail(429,'ถาม AI บ่อยเกินไป กรุณารอ 15 นาที');
   }
   const publicHost=publicOrigin?new URL(publicOrigin).host:null;
   const cookie=(token,age,req)=>`stocklens_session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secureCookies&&req.headers.host===publicHost?'; Secure':''}`;
@@ -242,6 +250,29 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
           if(error.code==='no_news')fail(422,'ยังไม่มีหัวข้อข่าวสำหรับหุ้นนี้ กรุณาเปิดแหล่งข่าวที่เกี่ยวข้อง');
           if(error.code==='providers_unavailable')fail(503,'Groq และ Ollama ยังไม่พร้อม ตรวจโควตา อินเทอร์เน็ต และ Ollama');
           fail(503,aiProvider==='groq'?'ติดต่อ Groq AI ไม่สำเร็จ ตรวจ API key โควตา และอินเทอร์เน็ต':'ติดต่อ AI ในเครื่องไม่สำเร็จ ตรวจว่าเปิด Ollama และติดตั้งโมเดลแล้ว');
+        }
+        if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+        return send(res,200,result);
+      }
+      if(pathname==='/api/ai/ask'&&req.method==='POST'){
+        const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
+        const input=await body(req),symbol=typeof input.symbol==='string'?input.symbol.trim().toUpperCase():'';
+        const question=typeof input.question==='string'?input.question.trim():'';
+        if(!symbols.has(symbol))fail(400,'ไม่รองรับหุ้นนี้');
+        if(question.length<5||question.length>300)fail(400,'กรุณาถามคำถาม 5–300 ตัวอักษร');
+        if(!Array.isArray(input.articleIds)||input.articleIds.length<1||input.articleIds.length>10||input.articleIds.some(id=>typeof id!=='string'||id.length<1||id.length>128)||new Set(input.articleIds).size!==input.articleIds.length)fail(400,'รายการข่าวไม่ถูกต้อง กรุณาสรุปข่าวใหม่');
+        const snapshot=news.snapshot(),sources=userData(user).state.sources;
+        const enabled=new Set(snapshot.sources.filter(feed=>sources.some(source=>source.enabled&&source.url.replace(/\/$/,'')===feed.url.replace(/\/$/,''))).map(feed=>feed.id));
+        const articleMap=new Map(snapshot.items.filter(item=>item.symbol===symbol&&enabled.has(item.feedId)).map(item=>[item.id,item]));
+        const articles=input.articleIds.map(id=>articleMap.get(id));
+        if(articles.some(item=>!item))fail(409,'ข่าวชุดนี้เปลี่ยนไป กรุณาสรุปข่าวใหม่');
+        limitAiQuestion(user);
+        let result;try{result=await ai.ask(symbol,question,articles);}
+        catch(error){
+          if(error.code==='disabled')fail(503,'AI ยังไม่เปิดใช้');
+          if(error.code==='not_configured')fail(503,'ยังไม่ได้ตั้งค่า Groq API key');
+          if(error.code==='providers_unavailable')fail(503,'Groq และ Ollama ยังไม่พร้อม ตรวจโควตา อินเทอร์เน็ต และ Ollama');
+          fail(503,'ติดต่อ AI ไม่สำเร็จ กรุณาลองใหม่');
         }
         if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
         return send(res,200,result);

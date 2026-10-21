@@ -56,6 +56,26 @@
 .ai-sources b{color:#fff;font-size:12px}
 .ai-sources a{color:#cce8ff;line-height:1.6;margin:10px 0;overflow-wrap:anywhere}
 .ai-sources a:hover{color:#fff}
+.ai-sources a{display:block;text-decoration:underline;text-underline-offset:2px}
+.ai-sources a small{display:block;color:#b9cee4;font-size:10px;text-decoration:none}
+.ai-timeline{display:flex;flex-wrap:wrap;gap:7px 16px;color:#d5e8fa;font-size:11px;line-height:1.5;margin:0 0 16px}
+.ai-timeline span{background:#ffffff12;border:1px solid #ffffff25;border-radius:7px;padding:6px 9px}
+.ai-timeline b{color:#fff}
+.ai-qa{border-top:1px solid #6380a0;margin-top:20px;padding-top:20px}
+.ai-qa h3{color:#fff;font-size:15px;margin:0 0 7px}
+.ai-qa>p{color:#d3e5f8;font-size:11px;line-height:1.7;margin:0 0 14px}
+.ai-qa .field{color:#e4eef9;font-size:12px;font-weight:700}
+.ai-qa textarea{box-sizing:border-box;width:100%;min-height:84px;background:#f8fbff;border:1px solid #9db9d8;border-radius:9px;color:#173b60;font:inherit;font-size:13px;line-height:1.55;margin:7px 0 10px;padding:11px;resize:vertical}
+.ai-qa textarea:focus-visible{outline:3px solid #a3caff;outline-offset:2px}
+.ai-qa form .btn{min-width:110px}
+.ai-answer{background:#ffffff0c;border:1px solid #ffffff24;border-radius:9px;margin-top:14px;padding:14px}
+.ai-answer-meta{display:flex;flex-direction:column;gap:3px;line-height:1.5}
+.ai-answer-meta b{color:#fff;font-size:12px;overflow-wrap:anywhere}
+.ai-answer-meta time{color:#b9cee4;font-size:10px}
+.ai-answer p{color:#e4eef9;font-size:12px;line-height:1.7;margin:10px 0;overflow-wrap:anywhere}
+.ai-answer-sources{border-top:1px solid #ffffff24;padding-top:9px}
+.ai-answer-sources b{color:#fff;display:block;font-size:11px;margin-bottom:5px}
+.ai-answer-sources a{color:#cce8ff;display:block;font-size:11px;line-height:1.5;margin:7px 0;overflow-wrap:anywhere}
 .ai-card [data-ai-summary]{background:#d4e9ff;border:1px solid #d4e9ff;color:#153e68;font-size:12px;margin-top:20px;min-height:43px;width:100%}
 .ai-card [data-ai-summary]:hover:not(:disabled){background:#fff;border-color:#fff;color:#153e68}
 .ai-card [data-ai-summary]:disabled{opacity:1;background:#8ba6c2;border-color:#8ba6c2;color:#173450;cursor:not-allowed}
