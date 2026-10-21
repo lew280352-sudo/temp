@@ -13,13 +13,13 @@ function authForm(mode,message='',email=''){
   }
 }
 function showSignedOut(mode='register',message='',email=''){
-  currentUser=null;stateRevision=0;state=structuredClone(defaults);committedState=structuredClone(defaults);query='';newsFilter='all';selectedStock='AAPL';resetNews();resetQuotes();resetAI();resetForecast();
+  currentUser=null;stateRevision=0;state=structuredClone(defaults);committedState=structuredClone(defaults);query='';newsFilter='all';selectedStock='AAPL';resetNews();resetQuotes();resetAI();resetForecast();resetResearch();
   if($('#modal').open)$('#modal').close();$('#modal-body').innerHTML='';$('#main').innerHTML='';
   document.querySelectorAll('[data-user-name],[data-user-email],[data-user-avatar]').forEach(el=>el.textContent='');
   document.body.classList.add('signed-out');history.replaceState(null,'','#'+mode);authForm(mode,message,email);window.scrollTo(0,0);
 }
 function enterApp(result){
-  currentUser=result.user;state=result.state;stateRevision=result.revision;committedState=structuredClone(state);selectedStock=state.watchlist.find(symbol=>stocks.some(s=>s.symbol===symbol))||'AAPL';resetNews();resetQuotes();resetAI();resetForecast();
+  currentUser=result.user;state=result.state;stateRevision=result.revision;committedState=structuredClone(state);selectedStock=state.watchlist.find(symbol=>stocks.some(s=>s.symbol===symbol))||'AAPL';resetNews();resetQuotes();resetAI();resetForecast();resetResearch();
   document.querySelectorAll('[data-user-name]').forEach(el=>el.textContent=currentUser.name);
   document.querySelectorAll('[data-user-email]').forEach(el=>el.textContent=currentUser.email);
   document.querySelectorAll('[data-user-avatar]').forEach(el=>el.textContent=Array.from(currentUser.name)[0].toUpperCase());

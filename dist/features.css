@@ -12,3 +12,16 @@
 .web-news-search>p{font-size:11px;line-height:1.8;color:#73849a}
 .web-news-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:15px 0 10px}
 .web-news-actions .btn{font-size:11px}
+.research-panel{margin:16px 0 20px}
+.research-panel h2{font-size:16px}
+.research-panel>p{margin:8px 0 16px}
+.research-companies{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin:14px 0}
+.research-company{border:1px solid #d9e4f1;border-radius:9px;background:#f7faff;color:#29445f;padding:11px;text-align:left;cursor:pointer;font:inherit}
+.research-company.selected{border-color:#406b9c;background:#e9f2fd}
+.research-company b{display:block;margin-bottom:3px}
+.research-choice{display:grid;gap:12px;margin:18px 0}
+.research-months{display:flex;gap:8px;flex-wrap:wrap}
+.research-months .tab{border:1px solid #d9e4f1;border-radius:8px;padding:8px 14px}
+.research-results{margin-top:22px;border-top:1px solid #dfe7f1;padding-top:18px}
+.research-results h3{font-size:16px;margin:0 0 10px}
+.research-results .ai-sources a{overflow-wrap:anywhere}

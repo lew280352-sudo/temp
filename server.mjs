@@ -11,6 +11,7 @@ import {marketFeeds} from './market-news.mjs';
 import { createQuoteService } from './quotes.mjs';
 import {createForecastService} from './forecast.mjs';
 import { createAiRouter, createAiService } from './ai.mjs';
+import {createResearchService,validateResearchSymbol,validateResearchMonths} from './research.mjs';
 import {newTotpSecret,verifyTotp,encryptSecret,decryptSecret} from './security.mjs';
 import {createPushService} from './push.mjs';
 import {createEmailVerification} from './email-verification.mjs';
@@ -59,7 +60,7 @@ async function passwordHash(password,salt){return deriveKey(password,salt,64,{N:
 const tokenHash=token=>createHash('sha256').update(token).digest('hex');
 function tokenFrom(req){return (req.headers.cookie||'').split(';').map(c=>c.trim()).find(c=>c.startsWith('stocklens_session='))?.slice(18)||'';}
 
-export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch,quoteApiKey='',quoteFetcher=fetch,historyApiKey='',historyFetcher=fetch,aiEnabled=false,aiProvider='ollama',aiBaseUrl='http://127.0.0.1:11434',aiApiKey='',aiModel,aiFallbackModel='qwen3:8b',aiFetcher=fetch,mfaKeyHex='',pushPublicKey='',pushPrivateKey='',pushSubject='',pushSender,emailOrigin='',smtpHost='',smtpPort=587,smtpUser='',smtpPass='',smtpFrom='',emailSender}={}){
+export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch,quoteApiKey='',quoteFetcher=fetch,researchFetcher=fetch,historyApiKey='',historyFetcher=fetch,aiEnabled=false,aiProvider='ollama',aiBaseUrl='http://127.0.0.1:11434',aiApiKey='',aiModel,aiFallbackModel='qwen3:8b',aiFetcher=fetch,mfaKeyHex='',pushPublicKey='',pushPrivateKey='',pushSubject='',pushSender,emailOrigin='',smtpHost='',smtpPort=587,smtpUser='',smtpPass='',smtpFrom='',emailSender}={}){
   if(mfaKeyHex&&!/^[a-f0-9]{64}$/i.test(mfaKeyHex))throw new Error('MFA_ENCRYPTION_KEY must be 64 hex characters');
   const mfaKey=mfaKeyHex?Buffer.from(mfaKeyHex,'hex'):null;
   if(publicOrigin){
@@ -106,6 +107,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
   };
   const news=createNewsService(db,{fetcher:newsFetcher,marketApiKey:quoteApiKey,marketFetcher:newsFetcher,selectedFeeds});
   const quotes=createQuoteService(db,{apiKey:quoteApiKey,fetcher:quoteFetcher});
+  const research=createResearchService({apiKey:quoteApiKey,fetcher:researchFetcher});
   const forecast=createForecastService(db,{apiKey:historyApiKey,fetcher:historyFetcher});
   const push=createPushService(db,{publicKey:pushPublicKey,privateKey:pushPrivateKey,subject:pushSubject,...(pushSender?{sender:pushSender}:{})});
   const email=createEmailVerification(db,{origin:emailOrigin||publicOrigin||'',smtpHost,smtpPort,smtpUser,smtpPass,smtpFrom,...(emailSender?{sender:emailSender}:{})});
@@ -116,6 +118,14 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
   let newsTimer;
   const newRecoveryCode=()=>randomBytes(24).toString('hex');
   const attempts=new Map();
+  const researchAttempts=new Map();
+  function limitResearch(user){
+    const now=Date.now(),entry=researchAttempts.get(user.id)||{count:0,until:now+15*60*1000};
+    if(now>=entry.until){entry.count=0;entry.until=now+15*60*1000;}
+    entry.count++;researchAttempts.set(user.id,entry);
+    if(researchAttempts.size>1000)for(const [id,item] of researchAttempts)if(now>=item.until)researchAttempts.delete(id);
+    if(entry.count>8)fail(429,'ค้นข่าวบ่อยเกินไป กรุณารอ 15 นาที');
+  }
   const cookie=(token,age)=>`stocklens_session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secureCookies?'; Secure':''}`;
   const send=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(data));};
   const userData=user=>{const row=user?db.prepare('SELECT data,revision FROM user_state WHERE user_id=?').get(user.id):null;return {user,state:row?JSON.parse(row.data):null,revision:row?.revision??null};};
@@ -157,7 +167,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       const origin=publicOrigin||`http://${req.headers.host}`;
       if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origin)fail(403,'คำขอไม่ได้มาจากเว็บไซต์นี้');
       const pathname=new URL(req.url,origin).pathname;
-      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.8.1'});}
+      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.9.0'});}
       if(pathname==='/api/ai/status'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
         const result=await ai.status();
@@ -187,6 +197,32 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         const snapshot=news.snapshot(),sources=userData(user).state.sources;
         const enabled=new Set(snapshot.sources.filter(feed=>sources.some(source=>source.enabled&&source.url.replace(/\/$/,'')===feed.url.replace(/\/$/,''))).map(feed=>feed.id));
         return send(res,200,{...snapshot,items:snapshot.items.filter(item=>enabled.has(item.feedId)),sources:snapshot.sources.filter(feed=>sources.some(source=>source.url.replace(/\/$/,'')===feed.url.replace(/\/$/,''))).map(feed=>({...feed,enabled:enabled.has(feed.id)}))});
+      }
+      if(pathname==='/api/research/companies'&&req.method==='GET'){
+        const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
+        const query=new URL(req.url,origin).searchParams.get('q')||'';
+        if(query.trim().length<2||query.length>80)fail(400,'กรอกชื่อบริษัทหรือ ticker 2 ถึง 80 ตัวอักษร');
+        limitResearch(user);
+        const items=await research.companies(query);
+        if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+        return send(res,200,{items});
+      }
+      if(pathname==='/api/research'&&req.method==='POST'){
+        const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
+        const input=await body(req);
+        let symbol,months;
+        try{symbol=validateResearchSymbol(input.symbol);months=validateResearchMonths(input.months);}catch(error){fail(400,error.message);}
+        const name=typeof input.name==='string'?input.name.trim().slice(0,120):'';
+        if(!name||name.length<2)fail(400,'กรุณาเลือกบริษัทจากผลค้นหา');
+        limitResearch(user);
+        const result=await research.news(symbol,name,months);
+        if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+        let summary=null,aiError='';
+        if(result.articles.length){
+          try{summary=await ai.summarize(symbol,result.articles);}catch(error){aiError=error.code==='not_configured'?'ยังไม่ได้ตั้งค่า Groq API key':error.code==='disabled'?'AI ยังไม่เปิดใช้งาน':'AI สรุปไม่ได้ในขณะนี้ กรุณาลองใหม่';}
+        }
+        if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+        return send(res,200,{...result,summary,aiError});
       }
       if(pathname==='/api/ai/summary'&&req.method==='POST'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
@@ -389,7 +425,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=86400'});
         return res.end(req.method==='HEAD'?undefined:data);
       }
-      const assets={'/quotes-ui.js':['quotes-ui.js','text/javascript'],'/':['index.html','text/html'],'/index.html':['index.html','text/html'],'/verify-email.html':['verify-email.html','text/html'],'/verify-email.js':['verify-email.js','text/javascript'],'/app.js':['app.js','text/javascript'],'/auth.js':['auth.js','text/javascript'],'/security-ui.js':['security-ui.js','text/javascript'],'/push-ui.js':['push-ui.js','text/javascript'],'/styles.css':['styles.css','text/css'],'/theme.css':['theme.css','text/css'],'/logo.css':['logo.css','text/css'],'/features.css':['features.css','text/css'],'/catalog.js':['catalog.js','text/javascript'],'/company-icons.js':['company-icons.js','text/javascript'],'/pwa.js':['pwa.js','text/javascript'],'/sw.js':['sw.js','text/javascript'],'/manifest.webmanifest':['manifest.webmanifest','application/manifest+json'],'/offline.html':['offline.html','text/html'],'/icon.svg':['icon.svg','image/svg+xml'],'/icon-192.png':['icon-192.png','image/png'],'/icon-512.png':['icon-512.png','image/png'],'/apple-touch-icon.png':['apple-touch-icon.png','image/png']};
+      const assets={'/quotes-ui.js':['quotes-ui.js','text/javascript'],'/':['index.html','text/html'],'/index.html':['index.html','text/html'],'/verify-email.html':['verify-email.html','text/html'],'/verify-email.js':['verify-email.js','text/javascript'],'/app.js':['app.js','text/javascript'],'/research-ui.js':['research-ui.js','text/javascript'],'/auth.js':['auth.js','text/javascript'],'/security-ui.js':['security-ui.js','text/javascript'],'/push-ui.js':['push-ui.js','text/javascript'],'/styles.css':['styles.css','text/css'],'/theme.css':['theme.css','text/css'],'/logo.css':['logo.css','text/css'],'/features.css':['features.css','text/css'],'/catalog.js':['catalog.js','text/javascript'],'/company-icons.js':['company-icons.js','text/javascript'],'/pwa.js':['pwa.js','text/javascript'],'/sw.js':['sw.js','text/javascript'],'/manifest.webmanifest':['manifest.webmanifest','application/manifest+json'],'/offline.html':['offline.html','text/html'],'/icon.svg':['icon.svg','image/svg+xml'],'/icon-192.png':['icon-192.png','image/png'],'/icon-512.png':['icon-512.png','image/png'],'/apple-touch-icon.png':['apple-touch-icon.png','image/png']};
       const asset=assets[pathname];if(!asset||!['GET','HEAD'].includes(req.method))fail(404,'ไม่พบหน้าเว็บ');
       const data=readFileSync(path.join(root,'dist',asset[0]));res.writeHead(200,{'Content-Type':asset[1]+'; charset=utf-8'});res.end(req.method==='HEAD'?undefined:data);
     }catch(error){send(res,error.status||500,{error:error.status?error.message:'ระบบขัดข้อง กรุณาลองใหม่'});if(!error.status)console.error(error.message);}
