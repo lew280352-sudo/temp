@@ -1,16 +1,21 @@
-let authMode='register',authBusy=false;
+let authMode='register',authBusy=false,pendingLogin=null;
 async function api(url,{method='GET',body:payload,timeout=20000}={}){
   let response;try{response=await fetch(url,{method,credentials:'same-origin',signal:AbortSignal.timeout(timeout),headers:payload?{'Content-Type':'application/json'}:undefined,body:payload?JSON.stringify(payload):undefined});}catch{throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจว่าเปิด StockLens อยู่');}
   let result;try{result=await response.json();}catch{throw new Error('เซิร์ฟเวอร์ยังไม่พร้อม กรุณาเปิดแอปผ่าน npm start');}
   if(!response.ok){const error=new Error(result.error||'ดำเนินการไม่สำเร็จ');error.status=response.status;throw error;}return result;
 }
 function authForm(mode,message='',email=''){
-  authMode=mode;const register=mode==='register';
+  pendingLogin=null;authMode=mode;const register=mode==='register';
   $('#auth-content').innerHTML=`<div class="auth-tabs" role="group" aria-label="เลือกสมัครสมาชิกหรือเข้าสู่ระบบ"><button data-auth-mode="register" class="${register?'active':''}" aria-pressed="${register}">สร้างบัญชี / Register</button><button data-auth-mode="login" class="${!register?'active':''}" aria-pressed="${!register}">เข้าสู่ระบบ / Login</button></div>${message?`<div class="auth-success" role="status">${escapeHtml(message)}</div>`:''}<h2>${register?'เริ่มต้นมองข่าวในแบบของคุณ':'ยินดีต้อนรับกลับมา'}</h2><p class="auth-description">${register?'สร้างบัญชีเพื่อเลือกบริษัทและแหล่งข่าว<br>ที่อยากให้เราติดตามเป็นพิเศษ':'เข้าสู่ระบบเพื่อกลับไปยังบริษัท<br>และแหล่งข่าวที่คุณเลือกไว้'}</p><form class="auth-form" id="${register?'register-form':'login-form'}">${register?'<label class="field">ชื่อที่แสดง<input name="name" autocomplete="name" minlength="2" maxlength="80" placeholder="ชื่อของคุณ" required></label>':''}<label class="field">อีเมล<input name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com" value="${escapeHtml(email)}" required></label><label class="field">รหัสผ่าน<span class="password-input"><input name="password" id="auth-password" type="password" autocomplete="${register?'new-password':'current-password'}" ${register?'minlength="10"':''} maxlength="128" placeholder="${register?'สร้างรหัสผ่านอย่างน้อย 10 ตัวอักษร':'กรอกรหัสผ่านของคุณ'}" required><button type="button" data-password-toggle="auth-password" aria-label="แสดงรหัสผ่าน" aria-pressed="false">แสดง</button></span>${register?'<small>ใช้รหัสผ่าน 10–128 ตัวอักษร</small>':''}</label>${register?'<label class="field">ยืนยันรหัสผ่าน<span class="password-input"><input name="confirm" id="auth-confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" placeholder="กรอกรหัสผ่านอีกครั้ง" required><button type="button" data-password-toggle="auth-confirm" aria-label="แสดงรหัสผ่านยืนยัน" aria-pressed="false">แสดง</button></span></label>':''}<p class="form-error" id="auth-error" role="alert"></p><button class="btn primary" type="submit">${register?'สร้างบัญชีของฉัน':'เข้าสู่ระบบ'} ${icon('arrow')}</button></form><div class="auth-bottom">${register?'มีบัญชีอยู่แล้ว?':'ยังไม่มีบัญชี?'} <button data-auth-mode="${register?'login':'register'}">${register?'เข้าสู่ระบบ':'สร้างบัญชีใหม่'}</button></div>`;
   if(!register){
-    $('#auth-password').closest('label').insertAdjacentHTML('afterend','<label class="field">รหัสจากแอป Authenticator (หากเปิด MFA)<input name="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="รหัส 6 หลัก"></label>');
     $('#auth-content').insertAdjacentHTML('beforeend','<button class="text-button recover-link" data-recover>ลืมรหัสผ่าน? ใช้รหัสกู้คืน</button>');
   }
+}
+function showLoginChallenge(result,email,password){
+  pendingLogin=result.factor==='authenticator'?{factor:result.factor,email,password}:{factor:'email',challengeId:result.challengeId};
+  const authenticator=result.factor==='authenticator';
+  $('#auth-content').innerHTML=`<h2>ยืนยันการเข้าสู่ระบบ</h2><p class="auth-description">${authenticator?'เปิดแอป Authenticator แล้วกรอกรหัส 6 หลัก':'ส่งรหัส 6 หลักไปที่อีเมล '+escapeHtml(email)+' แล้ว รหัสหมดอายุใน 10 นาที'}</p><form class="auth-form" id="login-challenge-form"><label class="field">${authenticator?'รหัสจากแอป Authenticator':'รหัสจากอีเมล'}<input name="code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" autofocus required></label><p class="form-error" id="auth-error" role="alert"></p><button class="btn primary" type="submit">ยืนยันรหัส ${icon('arrow')}</button></form><button class="text-button recover-link" data-auth-mode="login">กลับไปหน้าเข้าสู่ระบบ</button>`;
+  $('#login-challenge-form [name=code]').focus();
 }
 function showSignedOut(mode='register',message='',email=''){
   currentUser=null;stateRevision=0;state=structuredClone(defaults);committedState=structuredClone(defaults);query='';newsFilter='all';selectedStock='AAPL';resetNews();resetQuotes();resetAI();resetForecast();resetResearch();
@@ -19,6 +24,7 @@ function showSignedOut(mode='register',message='',email=''){
   document.body.classList.add('signed-out');history.replaceState(null,'','#'+mode);authForm(mode,message,email);window.scrollTo(0,0);
 }
 function enterApp(result){
+  pendingLogin=null;
   currentUser=result.user;state=result.state;stateRevision=result.revision;committedState=structuredClone(state);selectedStock=state.watchlist.find(symbol=>stocks.some(s=>s.symbol===symbol))||'AAPL';resetNews();resetQuotes();resetAI();resetForecast();resetResearch();
   document.querySelectorAll('[data-user-name]').forEach(el=>el.textContent=currentUser.name);
   document.querySelectorAll('[data-user-email]').forEach(el=>el.textContent=currentUser.email);
@@ -62,8 +68,21 @@ document.addEventListener('submit',async e=>{
     e.preventDefault();if(authBusy)return;const register=form.id==='register-form',errorEl=$('#auth-error');errorEl.textContent='';
     if(register&&form.elements.password.value!==form.elements.confirm.value){errorEl.textContent='รหัสผ่านทั้งสองช่องไม่ตรงกัน';form.elements.confirm.focus();return;}
     authBusy=true;const button=form.querySelector('[type=submit]'),original=button.innerHTML;button.disabled=true;button.textContent=register?'กำลังสร้างบัญชี…':'กำลังเข้าสู่ระบบ…';
-    try{const email=form.elements.email.value;const result=await api(register?'/api/register':'/api/login',{method:'POST',body:{email,password:form.elements.password.value,...(register?{name:form.elements.name.value}:{totp:form.elements.totp.value.trim()})}});if(register){authForm('login','สร้างบัญชีแล้ว เก็บรหัสกู้คืนด้านล่างก่อนเข้าสู่ระบบ',email);$('#auth-content').insertAdjacentHTML('beforeend',recoveryNotice(result.recoveryCode));history.replaceState(null,'','#login');$('#auth-password').focus();}else enterApp(result);}
+    try{const email=form.elements.email.value,password=form.elements.password.value;const result=await api(register?'/api/register':'/api/login',{method:'POST',body:{email,password,...(register?{name:form.elements.name.value}:{})}});if(register){authForm('login','สร้างบัญชีแล้ว เก็บรหัสกู้คืนด้านล่างก่อนเข้าสู่ระบบ',email);$('#auth-content').insertAdjacentHTML('beforeend',recoveryNotice(result.recoveryCode));history.replaceState(null,'','#login');$('#auth-password').focus();}else if(result.factor)showLoginChallenge(result,email,password);else enterApp(result);}
     catch(error){errorEl.textContent=error.message;}finally{authBusy=false;button.disabled=false;button.innerHTML=original;}
+  }
+  if(form.id==='login-challenge-form'){
+    e.preventDefault();if(authBusy||!pendingLogin)return;
+    const errorEl=$('#auth-error');errorEl.textContent='';authBusy=true;
+    const button=form.querySelector('[type=submit]');button.disabled=true;
+    try{
+      const code=form.elements.code.value.trim(),challenge=pendingLogin;
+      const result=challenge.factor==='authenticator'
+        ?await api('/api/login',{method:'POST',body:{email:challenge.email,password:challenge.password,totp:code}})
+        :await api('/api/login/verify',{method:'POST',body:{challengeId:challenge.challengeId,code}});
+      enterApp(result);
+    }catch(error){errorEl.textContent=error.message;}
+    finally{authBusy=false;button.disabled=false;}
   }
   if(form.id==='source-form'){
     e.preventDefault();if(!currentUser||isSaving)return;const errorEl=$('#source-error');errorEl.textContent='';

@@ -31,7 +31,9 @@ test('MFA requires the second factor, prevents replay, and account deletion remo
   const step=Math.floor(Date.now()/30000),code=totpCode(setup.data.secret,step);
   assert.equal((await call('/api/mfa/enable',{method:'POST',cookie,body:{code}})).status,200);
   assert.equal((await call('/api/security',{cookie})).data.mfaEnabled,true);
-  assert.equal((await call('/api/login',{method:'POST',body:account})).status,401,'password alone cannot log in');
+  const challenge=await call('/api/login',{method:'POST',body:account});
+  assert.equal(challenge.status,202,'password alone cannot log in');
+  assert.equal(challenge.data.factor,'authenticator');
   assert.equal((await call('/api/login',{method:'POST',body:{...account,totp:code}})).status,401,'setup code cannot be replayed');
   const next=totpCode(setup.data.secret,step+1);
   const loginWithMfa=await call('/api/login',{method:'POST',body:{...account,totp:next}});assert.equal(loginWithMfa.status,200);

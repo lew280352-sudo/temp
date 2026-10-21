@@ -34,6 +34,7 @@ try{
   await page.locator('#mfa-enable-form [type=submit]').click();await page.waitForSelector('#security-card [data-security-disable]');
   await page.locator('.sidebar [data-logout]').click();await page.waitForSelector('#login-form');
   await page.locator('#login-form [name=email]').fill('security-ui@example.com');await page.locator('#login-form [name=password]').fill('correct-test-password');
-  await page.locator('#login-form [type=submit]').click();await page.waitForFunction(()=>document.querySelector('#auth-error').textContent.includes('MFA'));
+  await page.locator('#login-form [type=submit]').click();await page.waitForSelector('#login-challenge-form');
+  assert.match(await page.locator('#login-challenge-form').innerText(),/Authenticator/);
   assert.deepEqual(errors,[]);console.log('PASS: weekly chart, MFA setup, and second-factor login requirement in browser');
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

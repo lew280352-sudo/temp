@@ -15,6 +15,7 @@ import {createResearchService,validateResearchSymbol,validateResearchMonths} fro
 import {newTotpSecret,verifyTotp,encryptSecret,decryptSecret} from './security.mjs';
 import {createPushService} from './push.mjs';
 import {createEmailVerification} from './email-verification.mjs';
+import {createLoginOtp} from './login-otp.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const deriveKey = promisify(scrypt);
@@ -60,7 +61,7 @@ async function passwordHash(password,salt){return deriveKey(password,salt,64,{N:
 const tokenHash=token=>createHash('sha256').update(token).digest('hex');
 function tokenFrom(req){return (req.headers.cookie||'').split(';').map(c=>c.trim()).find(c=>c.startsWith('stocklens_session='))?.slice(18)||'';}
 
-export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch,quoteApiKey='',quoteFetcher=fetch,researchFetcher=fetch,historyApiKey='',historyFetcher=fetch,aiEnabled=false,aiProvider='ollama',aiBaseUrl='http://127.0.0.1:11434',aiApiKey='',aiModel,aiFallbackModel='qwen3:8b',aiFetcher=fetch,mfaKeyHex='',pushPublicKey='',pushPrivateKey='',pushSubject='',pushSender,emailOrigin='',smtpHost='',smtpPort=587,smtpUser='',smtpPass='',smtpFrom='',emailSender}={}){
+export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite'),secureCookies=false,publicOrigin=null,refreshNews=false,newsFetcher=fetch,quoteApiKey='',quoteFetcher=fetch,researchFetcher=fetch,historyApiKey='',historyFetcher=fetch,aiEnabled=false,aiProvider='ollama',aiBaseUrl='http://127.0.0.1:11434',aiApiKey='',aiModel,aiFallbackModel='qwen3:8b',aiFetcher=fetch,mfaKeyHex='',pushPublicKey='',pushPrivateKey='',pushSubject='',pushSender,emailOrigin='',smtpHost='',smtpPort=587,smtpUser='',smtpPass='',smtpFrom='',emailSender,emailLoginEnabled=false}={}){
   if(mfaKeyHex&&!/^[a-f0-9]{64}$/i.test(mfaKeyHex))throw new Error('MFA_ENCRYPTION_KEY must be 64 hex characters');
   const mfaKey=mfaKeyHex?Buffer.from(mfaKeyHex,'hex'):null;
   if(publicOrigin){
@@ -111,6 +112,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
   const forecast=createForecastService(db,{apiKey:historyApiKey,fetcher:historyFetcher});
   const push=createPushService(db,{publicKey:pushPublicKey,privateKey:pushPrivateKey,subject:pushSubject,...(pushSender?{sender:pushSender}:{})});
   const email=createEmailVerification(db,{origin:emailOrigin||publicOrigin||'',smtpHost,smtpPort,smtpUser,smtpPass,smtpFrom,...(emailSender?{sender:emailSender}:{})});
+  const loginOtp=createLoginOtp(db,{enabled:emailLoginEnabled,smtpHost,smtpPort,smtpUser,smtpPass,smtpFrom,...(emailSender?{sender:emailSender}:{})});
   const ai=aiProvider==='hybrid'?createAiRouter(
     createAiService(db,{enabled:aiEnabled,provider:'groq',apiKey:aiApiKey,model:aiModel,fetcher:aiFetcher}),
     createAiService(db,{enabled:aiEnabled,provider:'ollama',baseUrl:aiBaseUrl,model:aiFallbackModel,fetcher:aiFetcher})
@@ -167,7 +169,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       const origin=publicOrigin||`http://${req.headers.host}`;
       if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origin)fail(403,'คำขอไม่ได้มาจากเว็บไซต์นี้');
       const pathname=new URL(req.url,origin).pathname;
-      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.9.1'});}
+      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.9.2'});}
       if(pathname==='/api/ai/status'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
         const result=await ai.status();
@@ -274,6 +276,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
           if(!changed.changes)fail(401,'รหัสกู้คืนนี้ถูกใช้แล้ว');
           db.prepare('UPDATE users SET salt=?,password_hash=? WHERE id=?').run(salt,hash,user.id);
           db.prepare('DELETE FROM user_mfa WHERE user_id=?').run(user.id);
+          db.prepare('DELETE FROM login_otp WHERE user_id=?').run(user.id);
           db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);db.exec('COMMIT');
         }catch(error){db.exec('ROLLBACK');throw error;}
         res.setHeader('Set-Cookie',cookie('',0));return send(res,200,{ok:true,recoveryCode});
@@ -291,7 +294,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       if(pathname==='/api/security'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
         const row=db.prepare('SELECT secret FROM user_mfa WHERE user_id=?').get(user.id);
-        return send(res,200,{mfaEnabled:!!row?.secret,mfaAvailable:!!mfaKey,...email.status(user.id)});
+        return send(res,200,{mfaEnabled:!!row?.secret,mfaAvailable:!!mfaKey,emailLoginEnabled:loginOtp.enabled,...email.status(user.id)});
       }
       if(pathname==='/api/email/send-verification'&&req.method==='POST'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
@@ -353,6 +356,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         if(step===null)fail(401,'รหัส MFA ไม่ถูกต้อง');
         db.exec('BEGIN');try{
           db.prepare('UPDATE user_mfa SET secret=pending_secret,pending_secret=NULL,pending_until=NULL,last_step=? WHERE user_id=?').run(step,user.id);
+          db.prepare('DELETE FROM login_otp WHERE user_id=?').run(user.id);
           db.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').run(user.id,tokenHash(tokenFrom(req)));
           db.exec('COMMIT');
         }catch(error){db.exec('ROLLBACK');throw error;}
@@ -378,11 +382,29 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
         const user=db.prepare('SELECT * FROM users WHERE email=?').get(email);
         const hash=await passwordHash(input.password,user?.salt||'0'.repeat(32));
         if(!user||!timingSafeEqual(hash,Buffer.from(user.password_hash,'hex'))||db.prepare('SELECT password_hash FROM users WHERE id=?').get(user.id)?.password_hash!==user.password_hash)fail(401,'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-        checkMfa(user.id,input.totp,{consume:true});
+        if(db.prepare('SELECT secret FROM user_mfa WHERE user_id=?').get(user.id)?.secret){
+          if(!input.totp)return send(res,202,{factor:'authenticator'});
+          checkMfa(user.id,input.totp,{consume:true});
+        }else if(loginOtp.enabled){
+          try{return send(res,202,await loginOtp.request(user));}
+          catch(error){fail(error.message==='Wait before requesting another login code'?429:503,'ส่งรหัสเข้าสู่อีเมลไม่ได้ กรุณาตรวจการตั้งค่า SMTP หรือรอ 1 นาที');}
+        }
         db.prepare('DELETE FROM sessions WHERE expires_at<=? OR token_hash=?').run(Date.now(),tokenHash(tokenFrom(req)));
         const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(tokenHash(token),user.id,Date.now()+SESSION_AGE);
         res.setHeader('Set-Cookie',cookie(token,SESSION_AGE/1000));
         return send(res,200,userData({id:user.id,name:user.name,email:user.email}));
+      }
+      if(pathname==='/api/login/verify'&&req.method==='POST'){
+        const input=await body(req);limit(req,'email-login');
+        const userId=loginOtp.verify(input.challengeId,input.code);
+        if(!userId)fail(401,'รหัสอีเมลไม่ถูกต้อง หมดอายุ หรือถูกใช้แล้ว');
+        const user=db.prepare('SELECT id,name,email FROM users WHERE id=?').get(userId);
+        if(!user)fail(401,'บัญชีนี้ไม่พร้อมใช้งาน');
+        if(db.prepare('SELECT secret FROM user_mfa WHERE user_id=?').get(user.id)?.secret)fail(401,'บัญชีนี้ต้องใช้รหัส Authenticator');
+        db.prepare('DELETE FROM sessions WHERE expires_at<=? OR token_hash=?').run(Date.now(),tokenHash(tokenFrom(req)));
+        const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(tokenHash(token),user.id,Date.now()+SESSION_AGE);
+        res.setHeader('Set-Cookie',cookie(token,SESSION_AGE/1000));
+        return send(res,200,userData(user));
       }
       if(pathname==='/api/logout'&&req.method==='POST'){
         await body(req);db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash(tokenFrom(req)));res.setHeader('Set-Cookie',cookie('',0));return send(res,200,{ok:true});
@@ -433,7 +455,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
   });
   server.requestTimeout=130000;server.headersTimeout=10000;
   if(refreshNews){server.once('listening',()=>{const cycle=()=>news.refresh().then(()=>push.deliver(news.snapshot())).catch(()=>{});cycle();newsTimer=setInterval(cycle,15*60*1000);newsTimer.unref();});}
-  server.on('close',()=>{clearInterval(newsTimer);news.close();quotes.close();forecast.close();ai.close();email.close();db.close();});
+  server.on('close',()=>{clearInterval(newsTimer);news.close();quotes.close();forecast.close();ai.close();email.close();loginOtp.close();db.close();});
   return server;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
@@ -441,7 +463,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   if(!Number.isInteger(port)||port<1||port>65535)throw new Error('PORT must be an integer from 1 to 65535');
   if(!['127.0.0.1','localhost','::1'].includes(host)&&!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN before listening beyond localhost');
   const groqApiKey=process.env.GROQ_API_KEY?.trim()||'',configuredProvider=(process.env.AI_PROVIDER||'auto').trim().toLowerCase(),aiProvider=configuredProvider==='auto'?(groqApiKey?'hybrid':'ollama'):configuredProvider;
-  const server=createApp({databasePath:process.env.DATABASE_PATH?path.resolve(process.env.DATABASE_PATH):undefined,publicOrigin:process.env.APP_ORIGIN||null,refreshNews:process.env.NEWS_ENABLED!=='false',quoteApiKey:process.env.FINNHUB_API_KEY?.trim()||'',historyApiKey:process.env.ALPHAVANTAGE_API_KEY?.trim()||'',aiEnabled:process.env.AI_ENABLED!=='false',aiProvider,aiBaseUrl:process.env.OLLAMA_URL||'http://127.0.0.1:11434',aiApiKey:groqApiKey,aiModel:['groq','hybrid'].includes(aiProvider)?(process.env.GROQ_MODEL||'qwen/qwen3.8-27b'):(process.env.OLLAMA_MODEL||'qwen3:8b'),aiFallbackModel:process.env.OLLAMA_MODEL||'qwen3:8b',mfaKeyHex:process.env.MFA_ENCRYPTION_KEY?.trim()||'',pushPublicKey:process.env.VAPID_PUBLIC_KEY?.trim()||'',pushPrivateKey:process.env.VAPID_PRIVATE_KEY?.trim()||'',pushSubject:process.env.VAPID_SUBJECT?.trim()||'',emailOrigin:process.env.APP_ORIGIN||`http://127.0.0.1:${port}`,smtpHost:process.env.SMTP_HOST?.trim()||'',smtpPort:Number(process.env.SMTP_PORT||587),smtpUser:process.env.SMTP_USER?.trim()||'',smtpPass:process.env.SMTP_PASS?.trim()||'',smtpFrom:process.env.SMTP_FROM?.trim()||''});
+  const server=createApp({databasePath:process.env.DATABASE_PATH?path.resolve(process.env.DATABASE_PATH):undefined,publicOrigin:process.env.APP_ORIGIN||null,refreshNews:process.env.NEWS_ENABLED!=='false',quoteApiKey:process.env.FINNHUB_API_KEY?.trim()||'',historyApiKey:process.env.ALPHAVANTAGE_API_KEY?.trim()||'',aiEnabled:process.env.AI_ENABLED!=='false',aiProvider,aiBaseUrl:process.env.OLLAMA_URL||'http://127.0.0.1:11434',aiApiKey:groqApiKey,aiModel:['groq','hybrid'].includes(aiProvider)?(process.env.GROQ_MODEL||'qwen/qwen3.8-27b'):(process.env.OLLAMA_MODEL||'qwen3:8b'),aiFallbackModel:process.env.OLLAMA_MODEL||'qwen3:8b',mfaKeyHex:process.env.MFA_ENCRYPTION_KEY?.trim()||'',pushPublicKey:process.env.VAPID_PUBLIC_KEY?.trim()||'',pushPrivateKey:process.env.VAPID_PRIVATE_KEY?.trim()||'',pushSubject:process.env.VAPID_SUBJECT?.trim()||'',emailOrigin:process.env.APP_ORIGIN||`http://127.0.0.1:${port}`,smtpHost:process.env.SMTP_HOST?.trim()||'',smtpPort:Number(process.env.SMTP_PORT||587),smtpUser:process.env.SMTP_USER?.trim()||'',smtpPass:process.env.SMTP_PASS?.trim()||'',smtpFrom:process.env.SMTP_FROM?.trim()||'',emailLoginEnabled:process.env.EMAIL_LOGIN_OTP_ENABLED==='true'});
   server.listen(port,host,()=>console.log(`StockLens: http://${host}:${server.address().port}`));
   server.on('error',error=>{console.error(error.code==='EADDRINUSE'?`พอร์ต ${port} ถูกใช้อยู่แล้ว ตั้งค่า PORT เป็นหมายเลขอื่น`:error.message);process.exitCode=1;});
   for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{server.close();server.closeIdleConnections();});

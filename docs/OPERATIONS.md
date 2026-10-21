@@ -46,6 +46,7 @@ backups/            สำเนาฐานข้อมูล (ไม่ขึ�
 | `MFA_ENCRYPTION_KEY` | ว่าง | คีย์ hex 64 ตัวอักษรสำหรับเข้ารหัส TOTP seed; สร้างด้วย `node scripts/configure-mfa.mjs` และเก็บไว้เมื่อ restore |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | ว่าง | คีย์ Web Push และ URL ติดต่อ; สร้างคู่คีย์ด้วย `node scripts/configure-push.mjs` |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | ว่าง | บัญชี SMTP สำหรับส่งลิงก์ยืนยันอีเมล; ไม่มีบัญชีจะไม่ส่งจริง |
+| `EMAIL_LOGIN_OTP_ENABLED` | `false` | เปิดรหัสอีเมลหลังรหัสผ่านเมื่อทดสอบ SMTP แล้ว; เปิดโดยไม่มี SMTP เซิร์ฟเวอร์จะไม่เริ่ม |
 | `BROWSER_PATH` | Edge บน Windows / Playwright Chromium บนระบบอื่น | ใช้เฉพาะ browser tests |
 
 `npm start` และ `npm run backup` โหลด `.env` ถ้ามี โดย environment ที่ตั้งใน process มีลำดับก่อน คัดลอก `.env.example` ไป `.env` เพื่อปรับค่า ห้าม commit `.env` หากเรียก `node server.mjs` โดยตรงต้องตั้ง env เอง
@@ -115,8 +116,9 @@ DATABASE_PATH=/persistent-data/stocklens.sqlite
 | `GET /api/ai/status` | Login; คืน provider/model/สถานะพร้อม โดยไม่คืน API key |
 | `POST /api/ai/summary` | Login + `{symbol}`; สรุปหัวข้อข่าวที่เปิดในบัญชีด้วย structured output |
 | `GET /api/health` | ตรวจ process/SQLite เท่านั้น ไม่ยืนยันว่า provider ภายนอกพร้อม |
-| `POST /api/login` | `{email,password}` รับ `{user,state,revision}` และ HttpOnly session cookie |
-| `POST /api/login` เมื่อเปิด MFA | เพิ่ม `totp` รหัส 6 หลัก; รหัสเดียวใช้ซ้ำไม่ได้ |
+| `POST /api/login` | `{email,password}` รับเซสชัน หรือ HTTP 202 เมื่อจำเป็นต้องกรอกรหัสขั้นที่สอง |
+| `POST /api/login` เมื่อเคยเปิด Authenticator | ตอบ 202 `{factor:"authenticator"}`; ส่ง `totp` พร้อมรหัสผ่านอีกครั้งเพื่อรับเซสชัน |
+| `POST /api/login/verify` | เมื่อเปิดรหัสอีเมล ส่ง `{challengeId,code}` รับเซสชันหลังยืนยันรหัส 6 หลักภายใน 10 นาที |
 | `GET /api/security` | สถานะ MFA และการยืนยันอีเมลของบัญชี |
 | `POST /api/mfa/setup`, `/api/mfa/enable`, `/api/mfa/disable` | ตั้ง Authenticator, ยืนยันรหัส และปิด MFA โดยต้องยืนยันรหัสผ่าน |
 | `POST /api/account/delete` | `{confirm,password,totp?}` ลบบัญชีและเซสชันทั้งหมด |
