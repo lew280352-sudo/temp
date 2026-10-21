@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
-  <title id="title">StockLens — เลนส์มองแนวโน้ม</title>
+  <title id="title">StockLens — อักษรย่อ SL</title>
   <rect width="512" height="512" fill="#283d57"/>
-  <circle cx="238" cy="227" r="123" fill="#344e6c" stroke="#dbe9f7" stroke-width="22"/>
-  <path d="m327 317 73 73" fill="none" stroke="#dbe9f7" stroke-linecap="round" stroke-width="29"/>
-  <path d="m156 271 50-42 44 28 73-79" fill="none" stroke="#9dc3e9" stroke-linecap="round" stroke-linejoin="round" stroke-width="22"/>
-  <circle cx="323" cy="178" r="12" fill="#eef6ff"/>
+  <circle cx="256" cy="256" r="161" fill="none" stroke="#58789a" stroke-width="6"/>
+  <path d="M263 167h-78c-36 0-59 20-59 50 0 29 25 43 58 43h31c31 0 53 15 53 43s-23 48-59 48h-80" fill="none" stroke="#e6f0fa" stroke-linecap="round" stroke-linejoin="round" stroke-width="31"/>
+  <path d="M314 163v184h74" fill="none" stroke="#9fc3e8" stroke-linecap="round" stroke-linejoin="round" stroke-width="31"/>
 </svg>

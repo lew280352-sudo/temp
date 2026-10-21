@@ -4,9 +4,9 @@
 
 | แบบ | แนวคิด | ไฟล์ |
 | --- | --- | --- |
-| 01 | เลนส์และเส้นแนวโน้ม (ใช้อยู่ในแอป) | [01-lens-trend.svg](01-lens-trend.svg) |
+| 01 | เลนส์และเส้นแนวโน้ม | [01-lens-trend.svg](01-lens-trend.svg) |
 | 02 | บัตรข่าวและข้อมูล | [02-news-card.svg](02-news-card.svg) |
-| 03 | อักษรย่อ SL | [03-sl-monogram.svg](03-sl-monogram.svg) |
+| 03 | อักษรย่อ SL (ใช้อยู่ในแอป) | [03-sl-monogram.svg](03-sl-monogram.svg) |
 | 04 | เรดาร์ติดตาม | [04-radar.svg](04-radar.svg) |
 | 05 | กราฟในกรอบโฟกัส | [05-focus-bars.svg](05-focus-bars.svg) |
 
