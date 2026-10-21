@@ -1,5 +1,8 @@
 import {chromium} from 'playwright';
 import {once} from 'node:events';
+import {mkdtempSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import {createApp} from '../server.mjs';
 import {feeds} from '../feeds.mjs';
@@ -8,6 +11,7 @@ const server=createApp({databasePath:':memory:',quoteApiKey:'fixture-only',quote
   return new Response(`<rss><channel><item><title><![CDATA[${feed.symbol} &lt;img src=x onerror=alert(1)&gt; test announcement]]></title><link>${feed.url}test-announcement</link><pubDate>Sun, 18 Oct 2026 08:00:00 GMT</pubDate></item></channel></rss>`);
 }});server.listen(0,'127.0.0.1');await once(server,'listening');
 const base=`http://127.0.0.1:${server.address().port}`;let browser;
+const artifactDir=mkdtempSync(path.join(tmpdir(),'stocklens-pwa-'));
 try{
   browser=await chromium.launch({executablePath:process.env.BROWSER_PATH||(process.platform==='win32'?'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe':undefined),headless:true});
   const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -41,6 +45,6 @@ try{
   await context.setOffline(true);await page.reload();assert.match(await page.locator('h1').innerText(),/ยังเชื่อมต่อ/);assert.doesNotMatch(await page.locator('body').innerText(),/pwa@example|AAPL|MSFT/);
   await context.setOffline(false);await page.locator('a').click();await page.waitForSelector('body:not(.signed-out)');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
-  await page.screenshot({path:'test-artifacts/pwa-mobile.png',fullPage:true});
+  await page.screenshot({path:path.join(artifactDir,'pwa-mobile.png'),fullPage:true});
   console.log('PASS: manifest/icons, service worker, real feed adapter fixtures, XSS escaping, source/watchlist filtering, privacy migration model, recovery and offline privacy.');
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

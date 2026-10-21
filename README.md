@@ -1,4 +1,4 @@
-# StockLens 0.9.0 — ข่าวบริษัทสหรัฐฯ / PWA
+# StockLens 0.9.1 — ข่าวบริษัทสหรัฐฯ / PWA
 
 **อัปเดต AI ฟรี:** ใช้ GroqCloud/Qwen 3.8 27B เป็นตัวหลัก แล้ว fallback ไป Ollama/Qwen3 8B อัตโนมัติเมื่อออนไลน์ขัดข้องหรือโควตาหมด พร้อม structured output, แหล่งอ้างอิง และ cache อ่าน [คู่มือตั้งค่า AI](docs/LOCAL_AI.md)
 
@@ -48,6 +48,7 @@ npm.cmd start
 - [ตั้งค่า AI ออนไลน์ฟรีหรือ AI ในเครื่อง](docs/LOCAL_AI.md)
 - [เปิดเซิร์ฟเวอร์ สำรอง และนำขึ้น HTTPS](docs/OPERATIONS.md)
 - [จุดบอดและสิ่งที่ยังขาด](docs/KNOWN_LIMITATIONS.md)
+- [ผลลองใช้ทุกส่วนและข้อเสนอแก้จุดติดขัด 0.9.1](docs/USABILITY_AUDIT_2026-10-21.md)
 - [ผลตรวจความปลอดภัยภายในและขอบเขตส่งผู้ตรวจภายนอก](docs/SECURITY_REVIEW.md)
 - [ผลทดสอบเวอร์ชัน US PWA](docs/RELEASE_03.md)
 - [ผลทดสอบ Local AI 0.4](docs/RELEASE_04.md)

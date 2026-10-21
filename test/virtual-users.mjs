@@ -9,7 +9,7 @@ import {createApp} from '../server.mjs';
 
 const count=20,label=process.argv.includes('--baseline')?'baseline':'verified';
 const stamp=new Date().toISOString().replace(/[:.]/g,'-');
-const directory=path.resolve('test-artifacts',`users20-${label}-${stamp}`);mkdirSync(directory,{recursive:true});
+const directory=path.join(os.tmpdir(),`stocklens-users20-${label}-${stamp}-${process.pid}`);mkdirSync(directory,{recursive:true});
 const server=createApp({databasePath:path.join(directory,'synthetic-users.sqlite')});
 server.listen(0,'127.0.0.1');await once(server,'listening');
 const base=`http://127.0.0.1:${server.address().port}`,requests=[],pendingMetrics=[],started=performance.now();

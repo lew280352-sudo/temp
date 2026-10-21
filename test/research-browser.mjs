@@ -27,8 +27,10 @@ try{
   await page.locator('[data-research-run]').click();await page.getByText('พบข่าวผลิตภัณฑ์ใหม่').waitFor();
   assert.equal(await page.locator('.research-results .ai-sources a').count(),1);
   assert.equal(await page.locator('.research-results .ai-sources a').getAttribute('href'),'https://publisher.example/nvidia-chip');
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'research results must fit on a phone');
   await page.locator('#company-query').fill('Apple');assert.equal(await page.locator('.research-results').count(),0);
-  await page.locator('.sidebar [data-logout]').click();await page.waitForSelector('#login-form');assert.equal(await page.locator('#main').innerHTML(),'');
+  await page.locator('.topbar [data-logout]').click();await page.waitForSelector('#login-form');assert.equal(await page.locator('#main').innerHTML(),'');
   assert.deepEqual(errors,[]);
   console.log('PASS: company search, month choice, AI summary, source link, query reset and logout');
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

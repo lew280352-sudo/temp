@@ -68,6 +68,14 @@ export function createNewsService(db,{fetcher=fetch,marketApiKey='',marketFetche
   }
   async function refresh(){await Promise.all([...baseFeeds,...selected()].map(refreshFeed));}
   async function refreshSelected(){await Promise.all(selected().map(refreshFeed));}
+  async function refreshFor(enabledUrls,watchlist){
+    const urls=new Set(enabledUrls),followed=new Set(watchlist);
+    const immediate=baseFeeds.filter(feed=>urls.has(feed.url)&&(feed.type!=='finance'||followed.has(feed.symbol))).filter(feed=>{
+      const row=db.prepare('SELECT checked_at FROM news_feeds WHERE id=?').get(feed.id);
+      return !row?.checked_at||now()-Date.parse(row.checked_at)>=15*60*1000;
+    });
+    await Promise.all([...immediate,...selected()].map(refreshFeed));
+  }
   function snapshot(){
     const activeFeeds=[...baseFeeds,...selected()];
     const items=[],statuses=activeFeeds.map(feed=>{
@@ -79,5 +87,5 @@ export function createNewsService(db,{fetcher=fetch,marketApiKey='',marketFetche
     items.sort((a,b)=>(b.publishedAt||'').localeCompare(a.publishedAt||''));
     return {items,sources:statuses,refreshMinutes:15};
   }
-  return {refresh,refreshSelected,snapshot,close(){closed=true;}};
+  return {refresh,refreshSelected,refreshFor,snapshot,close(){closed=true;}};
 }

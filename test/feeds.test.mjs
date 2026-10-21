@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {feeds,verifiedFeeds,parseFeed,fetchFeed,createNewsService} from '../feeds.mjs';
+import {marketFeeds} from '../market-news.mjs';
 
 const rss=feed=>`<rss><channel><item><title><![CDATA[<b>Company</b> &amp; earnings]]></title><link>${feed.url}news/example</link><pubDate>Sun, 18 Oct 2026 08:00:00 GMT</pubDate></item><item><title>Duplicate</title><link>${feed.url}news/example</link></item><item><title>Bad link</title><link>javascript:alert(1)</link></item><item><title>External</title><link>https://evil.example/</link></item></channel></rss>`;
 test('RSS/Atom parsing strips markup, rejects unsafe XML/URLs and deduplicates articles',()=>{
@@ -22,6 +23,20 @@ test('refresh coalesces requests, persists successful feeds and marks failures s
     await Promise.all([service.refresh(),service.refresh()]);assert.equal(calls,feeds.length);assert.equal(service.snapshot().items.length,feeds.length);assert.ok(service.snapshot().sources.every(s=>s.status==='ok'));
     fail=true;await service.refresh();assert.equal(service.snapshot().items.length,feeds.length);assert.ok(service.snapshot().items.every(i=>i.stale));assert.ok(service.snapshot().sources.every(s=>s.status==='error'));
     const restarted=createNewsService(db);assert.equal(restarted.snapshot().items.length,feeds.length);restarted.close();
+  }finally{service.close();db.close();}
+});
+test('first news view refreshes enabled official feeds and followed stocks without fetching every market feed',async()=>{
+  const db=new DatabaseSync(':memory:'),requested=[];
+  const now=Date.parse('2026-10-21T12:00:00Z');
+  const service=createNewsService(db,{marketApiKey:'fixture',now:()=>now,
+    fetcher:async url=>{requested.push(url);assert.equal(url,feeds[0].feedUrl);return new Response(rss(feeds[0]));},
+    marketFetcher:async url=>{requested.push(url);assert.match(url,/symbol=AAPL/);return Response.json([{headline:'Apple earnings report',source:'Reuters',url:'https://reuters.com/apple-earnings',datetime:now/1000}]);}
+  });
+  try{
+    await service.refreshFor([feeds[0].url,marketFeeds[0].url],['AAPL']);
+    assert.equal(requested.length,2);assert.equal(service.snapshot().items.length,2);
+    await service.refreshFor([feeds[0].url,marketFeeds[0].url],['AAPL']);
+    assert.equal(requested.length,2,'repeat page loads reuse recent news');
   }finally{service.close();db.close();}
 });
 test('an approved optional RSS source is fetched only when selected',async()=>{

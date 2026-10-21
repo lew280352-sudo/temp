@@ -9,6 +9,18 @@ document.addEventListener('input',event=>{if(event.target.id==='company-query'){
 document.addEventListener('click',async event=>{
   if(!currentUser)return;
   const button=event.target.closest('button');if(!button)return;
+  if(button.dataset.company){
+    const company=stocks.find(item=>item.symbol===button.dataset.company);
+    if(company)document.querySelector('#modal-body')?.insertAdjacentHTML('beforeend',`<button class="btn primary full-button" type="button" data-research-from-card="${escapeHtml(company.symbol)}">ดูข่าวย้อนหลังและให้ AI สรุป</button>`);
+  }
+  if(button.dataset.researchFromCard){
+    const company=stocks.find(item=>item.symbol===button.dataset.researchFromCard);
+    if(!company)return;
+    resetResearch();researchCompany={symbol:company.symbol,name:company.name};query=company.symbol;
+    $('#modal').close();navigate('search');
+    document.querySelector('#research-panel')?.scrollIntoView({block:'start'});
+    return;
+  }
   if(button.hasAttribute('data-research-find')){
     const term=query.trim(),epoch=++researchEpoch,userId=currentUser.id;
     researchError='';researchResult=null;researchCompanies=[];researchCompany=null;

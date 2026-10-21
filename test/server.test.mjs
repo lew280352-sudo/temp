@@ -62,7 +62,7 @@ test('URL normalization preserves public source links',()=>{
 test('reviewed RSS URLs produce account-isolated news while other URLs remain bookmarks',async t=>{
   const feed=verifiedFeeds[0],xml='<rss><channel><item><title>Federal Reserve announcement</title><link>https://www.federalreserve.gov/newsevents/pressreleases/example.htm</link><pubDate>Wed, 21 Oct 2026 12:00:00 GMT</pubDate></item></channel></rss>';
   let calls=0;
-  const server=createApp({databasePath:':memory:',newsFetcher:async url=>{calls++;assert.equal(url,feed.feedUrl);return new Response(xml);}});
+  const server=createApp({databasePath:':memory:',newsFetcher:async url=>{if(url===feed.feedUrl){calls++;return new Response(xml);}assert.ok(url.startsWith('https://'));return new Response('<rss><channel></channel></rss>');}});
   server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(resolve=>server.close(resolve)));
   const base=`http://127.0.0.1:${server.address().port}`;
   async function request(route,{method='GET',body,cookie}={}){

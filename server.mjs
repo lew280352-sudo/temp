@@ -167,7 +167,7 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       const origin=publicOrigin||`http://${req.headers.host}`;
       if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origin)fail(403,'คำขอไม่ได้มาจากเว็บไซต์นี้');
       const pathname=new URL(req.url,origin).pathname;
-      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.9.0'});}
+      if(pathname==='/api/health'&&req.method==='GET'){db.prepare('SELECT 1').get();return send(res,200,{ok:true,version:'0.9.1'});}
       if(pathname==='/api/ai/status'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
         const result=await ai.status();
@@ -192,7 +192,8 @@ export function createApp({databasePath=path.join(root,'.data','stocklens.sqlite
       }
       if(pathname==='/api/news'&&req.method==='GET'){
         const user=currentUser(req);if(!user)fail(401,'กรุณาเข้าสู่ระบบ');
-        await news.refreshSelected();
+        const preferences=userData(user).state;
+        await news.refreshFor(preferences.sources.filter(source=>source.enabled).map(source=>source.url),preferences.watchlist);
         if(currentUser(req)?.id!==user.id)fail(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
         const snapshot=news.snapshot(),sources=userData(user).state.sources;
         const enabled=new Set(snapshot.sources.filter(feed=>sources.some(source=>source.enabled&&source.url.replace(/\/$/,'')===feed.url.replace(/\/$/,''))).map(feed=>feed.id));
