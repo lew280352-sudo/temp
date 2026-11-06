@@ -1,5 +1,6 @@
 # คู่มือผู้ดูแลและนำขึ้นเซิร์ฟเวอร์
 
+คลาวด์ฟรีโดยไม่เปิดคอมค้างไว้: [ขั้นตอน Render Free + Turso Free และย้ายบัญชีเดิม](FREE_CLOUD.md) — มีการพักบริการและโควตาฟรี ต้องตั้งค่าและตรวจ deploy จริงก่อนถือว่าออนไลน์
 ## AI ออนไลน์หรือในเครื่อง (0.6.0)
 
 โหมด `AI_PROVIDER=auto` ใช้ Groq ก่อนเมื่อมี `GROQ_API_KEY` และ fail over ไป Ollama เมื่อคำขอออนไลน์ล้มเหลว มิฉะนั้นใช้ Ollama โดยตรง ผลสรุปอยู่ในตาราง `ai_summaries` และ cache key แยกตาม provider, model, ticker และชุดหัวข้อข่าว API key อยู่เฉพาะ environment ฝั่งเซิร์ฟเวอร์และไม่อยู่ใน response/log/database

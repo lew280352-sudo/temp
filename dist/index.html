@@ -2,45 +2,44 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#283d57">
+  <meta name="theme-color" content="#14101d">
   <meta name="description" content="StockLens แอปติดตามและสรุปข่าวบริษัทจากแหล่งที่คุณเลือก">
   <link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes">
   <title>StockLens — มองข่าวให้เห็นภาพ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="logo.css"><link rel="stylesheet" href="features.css"><link rel="stylesheet" href="ui-polish.css">
-  <script src="app.js" defer></script><script src="research-ui.js" defer></script><script src="quotes-ui.js" defer></script><script src="auth.js" defer></script><script src="security-ui.js" defer></script><script src="push-ui.js" defer></script><script src="pwa.js" defer></script>
+  <script src="icons.js" defer></script><script src="app.js" defer></script><script src="account-ui.js" defer></script><script src="research-ui.js" defer></script><script src="quotes-ui.js" defer></script><script src="auth.js" defer></script><script src="security-ui.js" defer></script><script src="push-ui.js" defer></script><script src="pwa.js" defer></script>
 </head>
 <body class="signed-out">
   <p id="offline-status" class="offline-status" role="status" hidden>ออฟไลน์ — บันทึกข้อมูลและโหลดข่าวไม่ได้จนกว่าจะเชื่อมต่ออีกครั้ง</p>
-  <section id="auth-screen" aria-label="สมัครสมาชิกและเข้าสู่ระบบ">
-    <div class="auth-story"><a class="brand" href="#register"><span class="brand-icon">s<span>l</span></span>stocklens<span class="brand-dot">.</span></a><div class="auth-story-content"><div class="eyebrow">YOUR PERSONAL NEWS PERSPECTIVE</div><h1>ข่าวที่กระจัดกระจาย<br>กลายเป็นภาพที่ชัดเจน</h1><p>บอกเราว่าคุณสนใจบริษัทและเว็บไซต์ไหน<br>โดยไม่ต้องเปิดเผยจำนวนหุ้นหรือต้นทุน</p><div class="auth-preview"><div class="auth-preview-head"><span>YOUR DAILY PERSPECTIVE</span><span class="preview-dot"></span></div><div class="auth-preview-title">เรื่องสำคัญจากแหล่งที่คุณเลือก</div><div class="auth-preview-lines"><span></span><span></span><span></span></div><div class="auth-source-tags"><span>บริษัท</span><span>คู่ค้า</span><span>ข่าวการเงิน</span></div><div class="auth-mini-chart" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="auth-steps"><span>01 <b>สร้างบัญชี</b></span><span>02 <b>เลือกบริษัท</b></span><span>03 <b>เลือกแหล่งข่าว</b></span></div></div><div class="auth-story-footer">A CLEARER VIEW. EVERY DAY.<span>STOCKLENS / 2026</span></div></div>
-    <div class="auth-panel"><div class="auth-panel-top"><span>พื้นที่ข่าวส่วนตัวของคุณ</span></div><div id="auth-content" class="auth-content"><p class="muted" role="status">กำลังตรวจสอบการเข้าสู่ระบบ…</p></div><div class="auth-panel-footer">เลือกบริษัทและเว็บไซต์ที่อยากติดตาม · รองรับ AI ออนไลน์ฟรีหรือโมเดลในเครื่อง<br>AI อาจสรุปผิดพลาด โปรดอ่านข่าวต้นฉบับก่อนตัดสินใจ</div></div>
+  <section id="auth-screen" data-mode="register" aria-label="สมัครสมาชิกและเข้าสู่ระบบ">
+    <a class="brand auth-brand" href="/"><span class="brand-icon">s<span>l</span></span>stocklens<span class="brand-dot">.</span></a>
+    <div class="auth-shell">
+      <div class="auth-panel"><div id="auth-content" class="auth-content"><p class="muted" role="status">กำลังตรวจสอบการเข้าสู่ระบบ…</p></div><p class="auth-panel-footer"><span data-icon="shield"></span>เก็บเฉพาะบริษัทและแหล่งข่าวที่เลือก</p></div>
+      <aside class="auth-story" aria-labelledby="auth-story-title"><div class="auth-story-content">
+        <div class="auth-story-intro"><h2 id="auth-story-title">ข่าวบริษัท<br>ที่คุณเลือกเอง</h2><p id="auth-story-description">รวมข่าวจากบริษัทที่สนใจไว้ในที่เดียว<br>พร้อมลิงก์กลับไปอ่านต้นฉบับ</p></div>
+        <figure class="auth-company-examples"><figcaption>ตัวอย่างบริษัทที่ติดตามได้</figcaption><ul><li><img src="company-icons/apple.svg" alt="" width="26" height="26"><span translate="no">AAPL</span></li><li><img src="company-icons/nvidia.svg" alt="" width="26" height="26"><span translate="no">NVDA</span></li><li><img src="company-icons/netflix.svg" alt="" width="26" height="26"><span translate="no">NFLX</span></li></ul></figure>
+        <ul class="auth-features"><li><span data-icon="wallet"></span><div><b>เลือกบริษัทและแหล่งข่าว</b><span>รายการติดตามแยกตามบัญชีของคุณ</span></div></li><li><span data-icon="external"></span><div><b>อ่านต่อจากต้นฉบับ</b><span>เห็นที่มาและเวลาเผยแพร่ของแต่ละข่าว</span></div></li></ul>
+        <div class="auth-story-action"><p id="auth-story-prompt">มีบัญชี StockLens แล้ว?</p><button class="btn auth-story-switch" data-auth-mode="login">เข้าสู่ระบบ</button></div>
+      </div></aside>
+    </div>
   </section>
-  <aside class="sidebar">
-    <a class="brand" href="#overview"><span class="brand-icon">s<span>l</span></span>stocklens<span class="brand-dot">.</span></a>
-    <div class="workspace"><span class="workspace-logo">N</span><div>พื้นที่ข่าวของฉัน<small>News preferences</small></div><span class="workspace-arrow">⌄</span></div>
-    <div class="nav-label">WORKSPACE</div>
-    <nav aria-label="เมนูหลัก">
-      <button data-page="overview" class="nav active"><span data-icon="grid"></span>ภาพรวม</button>
-      <button data-page="news" class="nav"><span data-icon="news"></span>ข่าวสาร & บทสรุป</button>
-      <button data-page="following" class="nav"><span data-icon="wallet"></span>สิ่งที่ติดตาม</button>
-      <button data-page="insights" class="nav"><span data-icon="spark"></span>AI Insights<span class="mini-new">LAB</span></button>
-      <button data-page="search" class="nav"><span data-icon="search"></span>ค้นหาบริษัท</button>
-    </nav>
-    <div class="nav-label bottom-label">PREFERENCES</div>
-    <button data-page="alerts" class="nav"><span data-icon="bell"></span>การแจ้งเตือน</button>
-    <button data-page="sources" class="nav"><span data-icon="layers"></span>แหล่งข้อมูล</button>
-    <div class="sidebar-note"><span data-icon="spark"></span><h4>ข่าวมากมาย ภาพเดียวที่ชัดขึ้น</h4><p>เชื่อมเรื่องราวของบริษัท<br>เข้ากับหุ้นที่คุณติดตาม</p><span>YOUR DAILY INVESTING COMPANION ↗</span></div>
-    <div class="profile"><span class="avatar" data-user-avatar>L</span><div class="profile-text"><span data-user-name>บัญชีของฉัน</span><small data-user-email></small></div><span class="online-dot"></span></div>
-    <button class="nav logout-button" data-logout><span aria-hidden="true">↪</span>ออกจากระบบ</button>
-    <a class="export-link" href="/api/export" download>ดาวน์โหลดข้อมูลบัญชี</a>
-  </aside>
   <div class="app">
-    <header class="topbar"><div class="breadcrumb">Workspace <span>/</span> <b id="breadcrumb">ภาพรวม</b></div><div class="top-actions"><button id="quick-search" class="search-button"><span data-icon="search"></span><span>ค้นหาหุ้นหรือบริษัท</span><kbd>/</kbd></button><button class="icon-button" data-page="sources" aria-label="แหล่งข้อมูล"><span data-icon="layers"></span></button><button class="icon-button" data-page="alerts" aria-label="การแจ้งเตือน"><span data-icon="bell"></span></button><button class="avatar small account-logout" data-logout aria-label="ออกจากระบบ" title="ออกจากระบบ"><span data-user-avatar>L</span></button></div></header>
-    <main id="main"></main>
+    <header class="topbar"><div class="topbar-leading"><a class="brand" href="#overview" data-page="overview" aria-label="StockLens ภาพรวม"><span class="brand-icon">s<span>l</span></span>stocklens<span class="brand-dot">.</span></a><div class="breadcrumb"><span>/</span> <b id="breadcrumb">ภาพรวม</b></div></div><div class="top-actions"><button id="quick-search" class="search-button"><span data-icon="search"></span><span>ค้นหาหุ้นหรือบริษัท</span><kbd>/</kbd></button><button class="icon-button" data-page="sources" aria-label="แหล่งข้อมูล"><span data-icon="layers"></span></button><button class="icon-button" data-page="alerts" aria-label="การแจ้งเตือน"><span data-icon="bell"></span></button><button class="avatar small account-logout" data-logout aria-label="ออกจากระบบ" title="ออกจากระบบ"><span data-user-avatar>L</span></button></div></header>
+    <main id="main" tabindex="-1"></main>
     <footer class="risk-footer"><span data-icon="shield"></span><span><b>AI อาจสรุปผิดพลาด</b> ควรอ่านต้นฉบับ · เก็บเฉพาะบริษัทและแหล่งข่าวที่เลือก · ไม่เก็บข้อมูลพอร์ต</span><span class="footer-mark">STOCKLENS / US</span></footer>
   </div>
-  <dialog id="modal"><div class="dialog-heading"><h2 id="modal-title"></h2><button id="close-modal" class="icon-button" aria-label="ปิด">✕</button></div><div id="modal-body"></div></dialog>
+  <nav class="app-dock mobile-nav" aria-label="เมนูหลัก">
+    <svg class="dock-surface" aria-hidden="true" focusable="false"><path></path></svg>
+    <span class="dock-bead" aria-hidden="true"></span>
+    <button class="nav" data-dock-icon="grid" data-page="overview"><span data-icon="grid"></span>ภาพรวม</button>
+    <button class="nav" data-dock-icon="news" data-page="news"><span data-icon="news"></span>ข่าวสาร</button>
+    <button class="nav" data-dock-icon="wallet" data-page="following"><span data-icon="wallet"></span>ติดตาม</button>
+    <button class="nav" data-dock-icon="spark" data-page="insights"><span data-icon="spark"></span>AI Insights</button>
+    <button class="nav" data-dock-icon="more" data-mobile-more aria-label="เพิ่มเติม" aria-controls="mobile-menu" aria-expanded="false"><span data-icon="more"></span>เพิ่มเติม</button>
+  </nav>
+  <dialog id="mobile-menu" aria-labelledby="mobile-menu-title"><div class="dialog-heading"><h2 id="mobile-menu-title">เพิ่มเติม</h2><button class="icon-button" data-close-mobile aria-label="ปิดเมนู"><span data-icon="close"></span></button></div><div class="profile menu-profile"><span class="avatar" data-user-avatar></span><div class="profile-text"><span data-user-name></span><small data-user-email></small></div></div><nav aria-label="เมนูเพิ่มเติม"><button class="nav" data-page="welcome"><span data-icon="check"></span>เริ่มใช้งาน</button><button class="nav" data-page="devices"><span data-icon="shield"></span>อุปกรณ์ที่เข้าสู่ระบบ</button><button class="nav" data-page="search"><span data-icon="search"></span>ค้นหาบริษัท</button><button class="nav" data-page="alerts"><span data-icon="bell"></span>การแจ้งเตือนและบัญชี</button><button class="nav" data-page="sources"><span data-icon="layers"></span>แหล่งข้อมูล</button></nav><a class="export-link" href="/api/export" download>ดาวน์โหลดข้อมูลบัญชี</a><button class="nav" data-logout><span data-icon="logout"></span>ออกจากระบบ</button></dialog>
+  <dialog id="modal" aria-labelledby="modal-title"><div class="dialog-heading"><h2 id="modal-title"></h2><button id="close-modal" class="icon-button" aria-label="ปิด"><span data-icon="close"></span></button></div><div id="modal-body"></div></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
 </body></html>

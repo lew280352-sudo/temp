@@ -10,9 +10,9 @@ async function refreshPushCard(){
     const registration=supported?await navigator.serviceWorker.getRegistration():null;
     const subscription=registration?await registration.pushManager.getSubscription():null;
     if(!document.contains(card)||!currentUser)return;
-    card.innerHTML=`<h2>แจ้งเตือนเมื่อปิดหน้าแอป</h2><p>${status.configured?'เซิร์ฟเวอร์พร้อมส่ง Web Push':'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า Web Push'} · ${subscription?'อุปกรณ์นี้เปิดรับแล้ว':'อุปกรณ์นี้ยังไม่เปิดรับ'}</p><p class="small-note">ส่งข่าวใหม่จากแหล่งที่เปิดไว้ตามการตั้งค่าด้านบน เมื่อเซิร์ฟเวอร์ยังทำงานและอุปกรณ์เชื่อมอินเทอร์เน็ต คอมปิดหรือเซิร์ฟเวอร์หยุดจะไม่ส่งข่าว</p><div class="security-actions">${subscription?'<button class="btn" data-push-disable>ปิด Push บนอุปกรณ์นี้</button><button class="btn" data-push-test>ส่งทดสอบ</button>':`<button class="btn" data-push-enable ${status.configured&&supported?'':'disabled'}>เปิด Push บนอุปกรณ์นี้</button>`}</div>${supported?'':'<p class="small-note">ต้องเปิดผ่าน HTTPS หรือ localhost และใช้เบราว์เซอร์ที่รองรับ Push</p>'}`;
+    card.innerHTML=`<h2>แจ้งเตือนเมื่อปิดหน้าแอป</h2><p>${status.configured?'เซิร์ฟเวอร์พร้อมส่ง Web Push':'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า Web Push'} · ${subscription?'อุปกรณ์นี้เปิดรับแล้ว':'อุปกรณ์นี้ยังไม่เปิดรับ'}</p><p class="small-note">ส่งข่าวใหม่จากแหล่งที่เปิดไว้ตามการตั้งค่าด้านบน เมื่อเซิร์ฟเวอร์ยังทำงานและอุปกรณ์เชื่อมอินเทอร์เน็ต ${status.backgroundSleeps?'บริการฟรีพักแอปหลังไม่มีการใช้งาน 15 นาที ระหว่างพักจะไม่ดึงข่าวหรือส่ง Push':'เมื่อเซิร์ฟเวอร์หยุดจะไม่ส่งข่าว'}</p><div class="security-actions">${subscription?'<button class="btn" data-push-disable>ปิด Push บนอุปกรณ์นี้</button><button class="btn" data-push-test>ส่งทดสอบ</button>':`<button class="btn" data-push-enable ${status.configured&&supported?'':'disabled'}>เปิด Push บนอุปกรณ์นี้</button>`}</div>${supported?'':'<p class="small-note">ต้องเปิดผ่าน HTTPS หรือ localhost และใช้เบราว์เซอร์ที่รองรับ Push</p>'}`;
     card.dataset.publicKey=status.publicKey||'';
-  }catch(error){if(document.contains(card))card.innerHTML=`<h2>Web Push</h2><p role="alert" class="form-error">${escapeHtml(error.message)}</p>`;}
+  }catch(error){if(document.contains(card)&&error.status===401){showSignedOut('login');return;}if(document.contains(card))card.innerHTML=`<h2>Web Push</h2><p role="alert" class="form-error">${escapeHtml(error.message)}</p>`;}
   finally{pushLoading=false;const latest=document.querySelector('#push-card');if(latest&&latest!==card)queueMicrotask(refreshPushCard);}
 }
 new MutationObserver(()=>{
@@ -26,25 +26,28 @@ async function localPushSubscription(){
   const registration=await navigator.serviceWorker.getRegistration();
   return registration?.pushManager.getSubscription()||null;
 }
-window.forgetLocalPush=async()=>{const sub=await localPushSubscription();if(sub)await sub.unsubscribe();};
+window.forgetLocalPush=async(allowed=()=>true)=>{const sub=await localPushSubscription();if(sub&&allowed())await sub.unsubscribe();};
 window.disablePushForLogout=async()=>{
   const sub=await localPushSubscription();if(!sub)return;
   try{await api('/api/push/unsubscribe',{method:'POST',body:{endpoint:sub.endpoint}});}finally{await sub.unsubscribe();}
 };
 document.addEventListener('click',async event=>{
   if(!currentUser)return;const button=event.target.closest('button');if(!button||!['pushEnable','pushDisable','pushTest'].some(key=>key in button.dataset))return;
+  const epoch=authEpoch,userId=currentUser.id,valid=()=>sameSession(epoch,userId),publicKey=document.querySelector('#push-card')?.dataset.publicKey;
   button.disabled=true;
   try{
     if(button.dataset.pushEnable!==undefined){
-      const permission=await Notification.requestPermission();if(permission!=='granted')throw new Error('ต้องอนุญาตการแจ้งเตือนก่อน');
+      const permission=await Notification.requestPermission();if(!valid())return;if(permission!=='granted')throw new Error('ต้องอนุญาตการแจ้งเตือนก่อน');
       const registration=await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
-      const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:document.querySelector('#push-card').dataset.publicKey});
+      await navigator.serviceWorker.ready;if(!valid())return;
+      const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:publicKey});
+      if(!valid()){await subscription.unsubscribe();return;}
       try{await api('/api/push/subscribe',{method:'POST',body:subscription.toJSON()});}catch(error){await subscription.unsubscribe();throw error;}
+      if(!valid())return;
       toast('เปิด Push บนอุปกรณ์นี้แล้ว');
     }
-    if(button.dataset.pushDisable!==undefined){await window.disablePushForLogout();toast('ปิด Push บนอุปกรณ์นี้แล้ว');}
-    if(button.dataset.pushTest!==undefined){const result=await api('/api/push/test',{method:'POST',body:{}});toast(result.sent?`ส่งทดสอบแล้ว ${result.sent} อุปกรณ์`:'ยังส่งไม่สำเร็จ ตรวจการเชื่อมต่อและสิทธิ์แจ้งเตือน');}
-    refreshPushCard();
-  }catch(error){toast(error.message);button.disabled=false;}
+    if(button.dataset.pushDisable!==undefined){await window.disablePushForLogout();if(!valid())return;toast('ปิด Push บนอุปกรณ์นี้แล้ว');}
+    if(button.dataset.pushTest!==undefined){const result=await api('/api/push/test',{method:'POST',body:{}});if(!valid())return;toast(result.sent?`ส่งทดสอบแล้ว ${result.sent} อุปกรณ์`:'ยังส่งไม่สำเร็จ ตรวจการเชื่อมต่อและสิทธิ์แจ้งเตือน');}
+    if(valid())refreshPushCard();
+  }catch(error){if(!valid())return;if(error.status===401)showSignedOut('login');else toast(error.message);if(button.isConnected)button.disabled=false;}
 });

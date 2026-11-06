@@ -16,8 +16,62 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
+      - run: npm run test:responsive
+        env:
+          UI_ARTIFACT_DIR: artifacts/responsive
+      - run: npm run test:reference-ui
+        env:
+          REFERENCE_ARTIFACT_DIR: artifacts/reference
+      - run: npm run test:account-ui
+        env:
+          ACCOUNT_ARTIFACT_DIR: artifacts/account
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: responsive-screenshots
+          path: |
+            artifacts/responsive
+            artifacts/reference
+            artifacts/account
+          if-no-files-found: ignore
+      - run: npm run test:research-ui
+      - run: npm run test:security-ui
+      - run: npm run test:login-ui
       - run: npm run test:pwa
       - run: npm run test:users
+        env:
+          USER_ARTIFACT_DIR: artifacts/users
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: virtual-user-results
+          path: |
+            artifacts/users/results.json
+            artifacts/users/*.png
+          if-no-files-found: ignore
+  remote-storage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      libsql:
+        image: ghcr.io/tursodatabase/libsql-server@sha256:6dd3eb276d9d3604e4a48ac4a999a2e267814732d57d7e94c04ba71482333a67
+        ports:
+          - 18080:8080
+      import-db:
+        image: ghcr.io/tursodatabase/libsql-server@sha256:6dd3eb276d9d3604e4a48ac4a999a2e267814732d57d7e94c04ba71482333a67
+        ports:
+          - 18081:8080
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: node --test test/database.http.mjs test/cloud-persistence.http.mjs
+      - run: node --test test/import-database.test.mjs
+        env:
+          TEST_IMPORT_DATABASE_URL: http://127.0.0.1:18081
   container:
     runs-on: ubuntu-latest
     timeout-minutes: 10

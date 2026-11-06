@@ -11,17 +11,23 @@
     "test": "node --test test/*.test.mjs",
     "test:ui": "node test/browser.mjs",
     "test:research-ui": "node test/research-browser.mjs",
-    "test:security-ui": "node test/security-browser.mjs",
+    "test:security-ui": "node test/security-browser.mjs && node test/security-race-browser.mjs",
     "test:login-ui": "node test/login-otp-browser.mjs",
     "test:users": "node test/virtual-users.mjs",
     "test:pwa": "node test/pwa.mjs",
     "backup": "node --env-file-if-exists=.env scripts/backup.mjs",
-    "audit:privacy": "node --env-file-if-exists=.env scripts/audit-privacy.mjs"
+    "audit:privacy": "node --env-file-if-exists=.env scripts/audit-privacy.mjs",
+    "test:responsive": "node test/responsive-browser.mjs",
+    "test:reference-ui": "node test/reference-ui-browser.mjs",
+    "test:account-ui": "node test/account-tools-browser.mjs",
+    "check:services": "node --env-file-if-exists=.env scripts/check-services.mjs",
+    "find:legacy": "node scripts/find-legacy-data.mjs"
   },
   "devDependencies": {
     "playwright": "^1.58.2"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "fast-xml-parser": "^5.11.2",
     "nodemailer": "^10.1.7",
     "web-push": "^3.6.7"

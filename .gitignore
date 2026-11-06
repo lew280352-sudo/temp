@@ -14,3 +14,7 @@ backups/
 *.db-wal
 *.log
 .DS_Store
+
+# Local skill tools, plans ledger and browser QA artifacts
+.superpowers/
+.taste-skill/
